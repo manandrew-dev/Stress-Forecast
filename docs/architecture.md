@@ -37,7 +37,7 @@ Rules:
 
 ```
 /
-├── AGENTS.md              # short pointer to these docs (Entire's `brain init-agents` also edits this)
+├── AGENTS.md              # short pointer to these docs (Entire setup also manages a block here)
 ├── docs/
 │   ├── requirements.md
 │   ├── architecture.md
@@ -241,7 +241,9 @@ Never commit real `.env` files. Keep `.env.example` up to date.
 
 ## 11. Entire setup (do this first)
 
-1. Install the Entire CLI and enable it on the repo.
-2. `entire plugin install graph`
-3. `entire brain setup`, then `entire brain init-agents` (adds a guide to `AGENTS.md` / `CLAUDE.md`; keep the pointer to these docs).
-4. Do some work through Gemini CLI or Claude Code so sessions are captured; Freebuff sessions are not.
+1. Install the [Entire CLI](https://github.com/entireio/cli#install) and put `entire` on your `PATH`.
+2. Enable capture with `entire enable --agent codex --skip-push-sessions --telemetry=false`, then run `entire agent add claude-code`. In Codex, review and approve the project hooks with `/hooks`.
+3. Run `entire plugin install graph` and `entire plugin install brain`. Activate them with `entire graph setup --repo .` and `entire brain setup --no-backfill --no-daemon --agent-hooks`. Setup maintains `.entire/agent-guide.md` and managed references in `AGENTS.md` and `CLAUDE.md`. Keep the project doc links outside those blocks.
+4. Complete a short Claude Code or Codex session and run `entire checkpoint list --pending` to verify capture. Use Claude Code for sponsor-track recordings. Entire CLI 0.13.1 supports capture for Claude Code and Codex. Gemini CLI and Freebuff sessions are outside its capture support.
+
+If Brain setup reports an uncommitted worktree, run `entire brain refresh --worktree` to index the current project context and docs. The persisted Graph index follows committed `HEAD`.
