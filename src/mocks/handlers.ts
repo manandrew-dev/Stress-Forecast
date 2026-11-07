@@ -255,7 +255,7 @@ export async function getReport(
       suggested_fix:
         shift === null
           ? `Ask the other instructors whether one of these could move — every nearby week is already busy for this class.`
-          : `Move ${courseCode(mine.course_id)} ${mine.title} ${Math.abs(shift)} days ${shift < 0 ? "earlier" : "later"}, to ${longDate(addDays(mine.due_date, shift))}. That week has no other major deadline for this class.`,
+          : `Move ${courseCode(mine.course_id)} ${mine.title} ${Math.abs(shift) === 7 ? "a week" : "two weeks"} ${shift < 0 ? "earlier" : "later"}, to ${longDate(addDays(mine.due_date, shift))}. That week has no other major deadline for this class.`,
     };
   }
   const biggest = [...weekDeadlines].sort((a, b) => (b.weight_pct ?? 0) - (a.weight_pct ?? 0))[0];

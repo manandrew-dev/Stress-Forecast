@@ -28,3 +28,11 @@ use the editor.
   own key and store it in Secrets.
 - **Secrets.** Lovable manages them. Do not put secret values in the repo.
 <!-- LOVABLE:END -->
+
+## Project rules
+
+- All network access goes through `src/api/client.ts` (the only place `fetch()` is called); while `VITE_USE_MOCKS` isn't `"false"` it answers from `src/mocks/`. Why: the real API is connected later by flipping one switch.
+- API types in `src/api/types.ts` mirror the backend contract field-for-field; never rename fields. Why: mocks and the real API must be interchangeable.
+- Auth is a stub (`src/auth/`): `useAuth()` returns a fake user and role; role guards live in `RequireRole`. No backend or Lovable Cloud. Why: real auth will replace the stub without touching pages.
+- Page components live in `src/pages/{student,rep}/`; files in `src/routes/` stay thin (head + component). Why: requested folder structure.
+- Cohort charts must break the line on suppressed days (`toCohortSeries` nulls them); covered by `src/test/rules.test.ts`. Why: privacy — too few responses must never be shown or interpolated.
