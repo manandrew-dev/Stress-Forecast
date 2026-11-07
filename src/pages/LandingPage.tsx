@@ -54,7 +54,7 @@ export function LandingPage() {
 
       <main>
         <section className="relative overflow-hidden">
-          <div className="mx-auto max-w-5xl px-4 pb-6 pt-10 sm:pt-16">
+          <div className="relative z-10 mx-auto max-w-5xl px-4 pb-6 pt-10 sm:pt-16">
             <div className="animate-rise max-w-2xl space-y-5">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
                 For students and class reps
