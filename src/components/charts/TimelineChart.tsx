@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import {
   CartesianGrid,
   ComposedChart,
@@ -36,7 +37,7 @@ interface Props {
 }
 
 function GapLabel({ viewBox }: { viewBox?: { x: number; y: number; width: number; height: number } }) {
-  if (!viewBox) return null;
+  if (!viewBox) return <g />;
   const cx = viewBox.x + viewBox.width / 2;
   const cy = viewBox.y + viewBox.height / 2;
   return (
@@ -58,7 +59,7 @@ function GapLabel({ viewBox }: { viewBox?: { x: number; y: number; width: number
 function markerLabel(mark: DeadlineMark, highlight: boolean) {
   const r = Math.max(3.5, Math.min(8, 3 + mark.totalWeight / 6));
   return function Marker({ viewBox }: { viewBox?: { x: number; y: number } }) {
-    if (!viewBox) return null;
+    if (!viewBox) return <g />;
     return (
       <circle
         cx={viewBox.x}
@@ -85,13 +86,22 @@ export function TimelineChart({
   minStudents,
   ariaLabel,
 }: Props) {
-  const end = rows.length ? rows[rows.length - 1].date : origin;
-  const maxX = rows.length ? rows[rows.length - 1].x : 0;
+  const lastRow = rows.at(-1);
+  const end = lastRow?.date ?? origin;
+  const maxX = lastRow?.x ?? 0;
   const marksByX = new Map(marks.map((m) => [m.x, m]));
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // On narrow screens the chart scrolls sideways; start with "today" in view.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || todayX === undefined || maxX === 0 || el.scrollWidth <= el.clientWidth) return;
+    el.scrollLeft = (el.scrollWidth * todayX) / maxX - el.clientWidth * 0.75;
+  }, [todayX, maxX]);
 
   function ChartTooltip({ active, payload }: TooltipProps<number, string>) {
-    if (!active || !payload?.length) return null;
-    const row = payload[0].payload as TimelineRow;
+    const row = payload?.[0]?.payload as TimelineRow | undefined;
+    if (!active || !row) return null;
     const mark = marksByX.get(row.x);
     return (
       <div className="max-w-64 rounded-xl border bg-popover px-3 py-2.5 text-sm shadow-lift">
@@ -132,7 +142,7 @@ export function TimelineChart({
   }
 
   return (
-    <div className="-mx-2 overflow-x-auto px-2" role="img" aria-label={ariaLabel}>
+    <div ref={scrollRef} className="-mx-2 overflow-x-auto px-2" role="img" aria-label={ariaLabel}>
       <div className="h-72 min-w-[680px] sm:h-80">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={rows} margin={{ top: 22, right: 12, bottom: 0, left: -18 }}>

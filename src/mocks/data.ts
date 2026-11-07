@@ -27,8 +27,8 @@ export const BASE_DEADLINES: Deadline[] = [
   { id: 103, course_id: 1, title: "Midterm 1", due_date: "2026-10-06", weight_pct: 15, type: "midterm" },
   { id: 104, course_id: 1, title: "Quiz 2", due_date: "2026-10-20", weight_pct: 3, type: "quiz" },
   { id: 105, course_id: 1, title: "Midterm 2", due_date: "2026-11-03", weight_pct: 25, type: "midterm" },
-  { id: 106, course_id: 1, title: "Project phase 2", due_date: "2026-11-18", weight_pct: 15, type: "project" },
-  { id: 107, course_id: 1, title: "Final exam", due_date: "2026-12-10", weight_pct: 30, type: "exam" },
+  { id: 106, course_id: 1, title: "Project phase 2", due_date: "2026-11-18", weight_pct: 20, type: "project" },
+  { id: 107, course_id: 1, title: "Final exam", due_date: "2026-12-10", weight_pct: 25, type: "exam" },
   // MATH 200
   { id: 201, course_id: 2, title: "WeBWorK 1", due_date: "2026-09-18", weight_pct: 2, type: "assignment" },
   { id: 202, course_id: 2, title: "WeBWorK 2", due_date: "2026-10-02", weight_pct: 2, type: "assignment" },
@@ -42,7 +42,7 @@ export const BASE_DEADLINES: Deadline[] = [
   { id: 302, course_id: 3, title: "Lab 2", due_date: "2026-10-16", weight_pct: 5, type: "assignment" },
   { id: 303, course_id: 3, title: "Midterm", due_date: "2026-10-21", weight_pct: 20, type: "midterm" },
   { id: 304, course_id: 3, title: "Circuits project", due_date: "2026-11-04", weight_pct: 10, type: "project" },
-  { id: 305, course_id: 3, title: "Lab 3", due_date: "2026-11-20", weight_pct: 5, type: "assignment" },
+  { id: 305, course_id: 3, title: "Lab 3", due_date: "2026-11-20", weight_pct: 10, type: "assignment" },
   { id: 306, course_id: 3, title: "Clicker participation", due_date: "2026-12-04", weight_pct: null, type: "other" },
   { id: 307, course_id: 3, title: "Final exam", due_date: "2026-12-12", weight_pct: 45, type: "exam" },
   // ENGL 110

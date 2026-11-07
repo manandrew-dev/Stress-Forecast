@@ -165,10 +165,10 @@ export async function getMyTrend(user: AuthUser | null): Promise<TrendResponse> 
 
 function headsUpMessage(c: DetectedCollision): string {
   const days = diffDays(c.end, c.start) + 1;
-  const first = c.deadlines[0];
+  const first = c.deadlines[0]!;
   const startsIn = diffDays(c.start, MOCK_TODAY);
-  const when = startsIn <= 0 ? "starting today" : startsIn === 1 ? "starting tomorrow" : `in ${startsIn} days`;
-  return `${c.deadline_count} assessments worth ${c.total_weight_pct}% land within ${days} days, ${when}. Getting a head start on ${first.title} (${courseCode(first.course_id)}) this weekend will make that stretch much lighter.`;
+  const when = startsIn <= 0 ? "starting today" : startsIn === 1 ? "starting tomorrow" : `starting ${startsIn} days from now`;
+  return `${c.deadline_count} assessments worth ${c.total_weight_pct}% are packed into ${days} days, ${when}. Getting a head start on ${first.title} (${courseCode(first.course_id)}) this weekend will make that stretch much lighter.`;
 }
 
 export async function getHeadsUp(user: AuthUser | null): Promise<HeadsUpResponse> {
@@ -255,11 +255,11 @@ export async function getReport(
       suggested_fix:
         shift === null
           ? `Ask the other instructors whether one of these could move — every nearby week is already busy for this class.`
-          : `Move ${courseCode(mine.course_id)} ${mine.title} ${Math.abs(shift)} days ${shift < 0 ? "earlier" : "later"}, to ${longDate(addDays(mine.due_date, shift))}. That week has no other major deadline for this class.`,
+          : `Move ${courseCode(mine.course_id)} ${mine.title} ${Math.abs(shift) === 7 ? "a week" : "two weeks"} ${shift < 0 ? "earlier" : "later"}, to ${longDate(addDays(mine.due_date, shift))}. That week has no other major deadline for this class.`,
     };
   }
-  if (weekDeadlines.length > 0) {
-    const biggest = [...weekDeadlines].sort((a, b) => (b.weight_pct ?? 0) - (a.weight_pct ?? 0))[0];
+  const biggest = [...weekDeadlines].sort((a, b) => (b.weight_pct ?? 0) - (a.weight_pct ?? 0))[0];
+  if (biggest) {
     return {
       week_start,
       summary: `Average stress was ${avg.toFixed(1)}, with a peak of ${peak.avg_stress} on ${shortDate(peak.date)}. ${weekDeadlines.length} deadline${weekDeadlines.length > 1 ? "s" : ""} this week, none overlapping heavily.`,

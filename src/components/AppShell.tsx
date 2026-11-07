@@ -97,7 +97,7 @@ export function AppShell({
               <Link
                 key={item.to}
                 to={item.to}
-                activeOptions={{ exact: item.exact }}
+                activeOptions={{ exact: item.exact ?? false }}
                 className="rounded-full px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                 activeProps={{ className: "bg-primary-soft text-foreground" }}
               >
@@ -126,7 +126,7 @@ export function AppShell({
             <li key={item.to} className="flex-1">
               <Link
                 to={item.to}
-                activeOptions={{ exact: item.exact }}
+                activeOptions={{ exact: item.exact ?? false }}
                 className="flex flex-col items-center gap-0.5 py-2 text-[11px] font-medium text-muted-foreground"
                 activeProps={{ className: "text-primary" }}
               >

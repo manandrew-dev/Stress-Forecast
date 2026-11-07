@@ -22,13 +22,15 @@ export function detectCollisions(deadlines: Deadline[]): DetectedCollision[] {
   const out: DetectedCollision[] = [];
   let i = 0;
   while (i < sorted.length) {
-    const windowEnd = addDays(sorted[i].due_date, COLLISION_WINDOW_DAYS - 1);
+    const anchor = sorted[i]!;
+    const windowEnd = addDays(anchor.due_date, COLLISION_WINDOW_DAYS - 1);
     const group = sorted.slice(i).filter((d) => d.due_date <= windowEnd);
     const total = group.reduce((s, d) => s + (d.weight_pct ?? 0), 0);
+    const last = group.at(-1) ?? anchor;
     if (group.length >= COLLISION_MIN_COUNT && total >= COLLISION_MIN_WEIGHT) {
       out.push({
-        start: group[0].due_date,
-        end: group[group.length - 1].due_date,
+        start: anchor.due_date,
+        end: last.due_date,
         deadline_count: group.length,
         total_weight_pct: total,
         deadlines: group,
