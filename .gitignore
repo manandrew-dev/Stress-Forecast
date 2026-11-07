@@ -150,3 +150,7 @@ vite.config.ts.timestamp-*
 
 # Per-user Claude Code hooks and settings
 /.claude/settings.local.json
+
+# Repository-local coding agent directories
+/.claude/
+/.codex/
