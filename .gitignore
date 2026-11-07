@@ -147,3 +147,6 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# Per-user Claude Code hooks and settings
+/.claude/settings.local.json
