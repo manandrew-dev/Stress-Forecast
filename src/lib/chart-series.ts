@@ -66,7 +66,7 @@ export function fillTimeline(
   end: string,
 ): TimelineRow[] {
   const byDate = new Map(points.map((p) => [p.date, p]));
-  const lastDataDate = points.length ? points[points.length - 1].date : origin;
+  const lastDataDate = points.at(-1)?.date ?? origin;
   return dayRange(origin, end).map((date) => {
     const p = byDate.get(date);
     return {

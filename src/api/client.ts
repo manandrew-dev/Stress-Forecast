@@ -19,8 +19,8 @@ import type {
   WeeklyReport,
 } from "./types";
 
-const USE_MOCKS = import.meta.env.VITE_USE_MOCKS !== "false";
-const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "/api";
+const USE_MOCKS = import.meta.env["VITE_USE_MOCKS"] !== "false";
+const API_BASE = (import.meta.env["VITE_API_BASE_URL"] as string | undefined) ?? "/api";
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);

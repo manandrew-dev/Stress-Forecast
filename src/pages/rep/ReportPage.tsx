@@ -19,15 +19,17 @@ function Report({ courseId }: { courseId: number }) {
   const cohort = useQuery({ queryKey: qk.cohort(courseId), queryFn: () => api.getCohort(courseId) });
   const weeks = useMemo(() => {
     const days = cohort.data?.days ?? [];
-    if (!days.length) return [];
+    const first = days[0];
+    const last = days.at(-1);
+    if (!first || !last) return [];
     const out: string[] = [];
-    for (let w = weekStartOf(days[0].date); w <= days[days.length - 1].date; w = addDays(w, 7)) out.push(w);
+    for (let w = weekStartOf(first.date); w <= last.date; w = addDays(w, 7)) out.push(w);
     return out.reverse();
   }, [cohort.data]);
 
   const [week, setWeek] = useState<string | null>(null);
   useEffect(() => {
-    if (weeks.length && (!week || !weeks.includes(week))) setWeek(weeks[0]);
+    if (weeks.length && (!week || !weeks.includes(week))) setWeek(weeks[0] ?? null);
   }, [weeks, week]);
 
   const report = useQuery({
@@ -59,7 +61,7 @@ function Report({ courseId }: { courseId: number }) {
               size="icon"
               aria-label="Previous week"
               disabled={idx >= weeks.length - 1}
-              onClick={() => setWeek(weeks[idx + 1])}
+              onClick={() => setWeek(weeks[idx + 1] ?? week)}
             >
               <ChevronLeft />
             </Button>
@@ -80,7 +82,7 @@ function Report({ courseId }: { courseId: number }) {
               size="icon"
               aria-label="Next week"
               disabled={idx <= 0}
-              onClick={() => setWeek(weeks[idx - 1])}
+              onClick={() => setWeek(weeks[idx - 1] ?? week)}
             >
               <ChevronRight />
             </Button>

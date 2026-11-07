@@ -21,7 +21,7 @@ export const TYPE_LABEL: Record<DeadlineType, string> = {
   other: "Other",
 };
 
-export function DeadlineRow({ deadline, course }: { deadline: Deadline; course?: Course }) {
+export function DeadlineRow({ deadline, course }: { deadline: Deadline; course?: Course | undefined }) {
   const Icon = TYPE_ICON[deadline.type];
   return (
     <li className="flex items-center gap-3 py-2.5">

@@ -63,7 +63,8 @@ function useVoiceInput(onText: (text: string) => void) {
     rec.onresult = (e) => {
       let chunk = "";
       for (let i = e.resultIndex; i < e.results.length; i++) {
-        if (e.results[i].isFinal) chunk += e.results[i][0].transcript;
+        const r = e.results[i];
+        if (r?.isFinal) chunk += r[0].transcript;
       }
       if (chunk.trim()) onText(chunk.trim());
     };

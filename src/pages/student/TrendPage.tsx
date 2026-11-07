@@ -30,12 +30,16 @@ export function TrendPage() {
   const q = useQuery({ queryKey: qk.trend(user?.id ?? "anon"), queryFn: api.getMyTrend });
 
   const chart = useMemo(() => {
-    if (!q.data || q.data.points.length === 0) return null;
+    const first = q.data?.points[0];
+    const lastPoint = q.data?.points.at(-1);
+    if (!q.data || !first || !lastPoint) return null;
     const { points, deadlines } = q.data;
     const sortedDue = deadlines.map((d) => d.due_date).sort();
-    const origin = [points[0].date, sortedDue[0]].filter(Boolean).sort()[0];
-    const today = points[points.length - 1].date;
-    const end = [today, sortedDue[sortedDue.length - 1] ?? today].sort()[1];
+    const firstDue = sortedDue[0] ?? first.date;
+    const origin = firstDue < first.date ? firstDue : first.date;
+    const today = lastPoint.date;
+    const lastDue = sortedDue.at(-1) ?? today;
+    const end = lastDue > today ? lastDue : today;
     const last7 = points.filter((p) => p.date > addDays(today, -7));
     const sleeps = last7.map((p) => p.sleep_hours).filter((s): s is number => s !== null);
     return {

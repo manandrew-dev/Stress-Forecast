@@ -15,8 +15,8 @@ import { WithCourse } from "./PickCourse";
 function CohortView({ data }: { data: CohortResponse }) {
   const courses = useCourseMap();
   const view = useMemo(() => {
-    const origin = data.days[0]?.date ?? data.deadlines[0]?.due_date;
-    const today = data.days[data.days.length - 1]?.date ?? origin;
+    const origin = data.days[0]?.date ?? data.deadlines[0]?.due_date ?? "";
+    const today = data.days.at(-1)?.date ?? origin;
     const lastDue = data.deadlines.map((d) => d.due_date).sort().at(-1) ?? today;
     const end = lastDue > today ? lastDue : today;
     const series = toCohortSeries(data.days, origin);
