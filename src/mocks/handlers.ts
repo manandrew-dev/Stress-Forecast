@@ -167,8 +167,8 @@ function headsUpMessage(c: DetectedCollision): string {
   const days = diffDays(c.end, c.start) + 1;
   const first = c.deadlines[0]!;
   const startsIn = diffDays(c.start, MOCK_TODAY);
-  const when = startsIn <= 0 ? "starting today" : startsIn === 1 ? "starting tomorrow" : `in ${startsIn} days`;
-  return `${c.deadline_count} assessments worth ${c.total_weight_pct}% land within ${days} days, ${when}. Getting a head start on ${first.title} (${courseCode(first.course_id)}) this weekend will make that stretch much lighter.`;
+  const when = startsIn <= 0 ? "starting today" : startsIn === 1 ? "starting tomorrow" : `starting ${startsIn} days from now`;
+  return `${c.deadline_count} assessments worth ${c.total_weight_pct}% are packed into ${days} days, ${when}. Getting a head start on ${first.title} (${courseCode(first.course_id)}) this weekend will make that stretch much lighter.`;
 }
 
 export async function getHeadsUp(user: AuthUser | null): Promise<HeadsUpResponse> {
