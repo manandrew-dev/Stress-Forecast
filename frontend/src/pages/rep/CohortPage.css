@@ -1,0 +1,456 @@
+.cohort-page {
+  --cohort-ink: #182326;
+  --cohort-muted: #647477;
+  --cohort-line: #dce5e2;
+  --cohort-paper: #ffffff;
+  --cohort-wash: #f3f7f4;
+  --cohort-green: #16785f;
+  --cohort-green-soft: #e3f3ed;
+  --cohort-amber: #bb6a37;
+  --cohort-amber-soft: #fff4e9;
+  box-sizing: border-box;
+  min-height: 100%;
+  padding: clamp(1.25rem, 3vw, 2.75rem);
+  color: var(--cohort-ink);
+  background:
+    radial-gradient(ellipse at 90% 0%, rgba(215, 237, 225, 0.54), transparent 28rem),
+    #f7f9f6;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.cohort-page *,
+.cohort-page *::before,
+.cohort-page *::after {
+  box-sizing: inherit;
+}
+
+.cohort-page__header,
+.cohort-page__card-heading,
+.cohort-page__summary {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.5rem;
+}
+
+.cohort-page__header {
+  max-width: 1240px;
+  margin: 0 auto 1.75rem;
+}
+
+.cohort-page__header h1 {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 700;
+  letter-spacing: -0.055em;
+  line-height: 1.05;
+}
+
+.cohort-page__intro {
+  max-width: 38rem;
+  margin: 0.75rem 0 0;
+  color: var(--cohort-muted);
+  font-size: 0.97rem;
+  line-height: 1.55;
+}
+
+.cohort-page__eyebrow {
+  margin: 0 0 0.48rem;
+  color: var(--cohort-muted);
+  font-size: 0.68rem;
+  font-weight: 750;
+  letter-spacing: 0.14em;
+}
+
+.cohort-page__course-field {
+  display: grid;
+  gap: 0.45rem;
+  min-width: min(18rem, 100%);
+  color: var(--cohort-muted);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.cohort-page__course-field select {
+  width: 100%;
+  min-height: 2.9rem;
+  padding: 0.7rem 2.5rem 0.7rem 0.85rem;
+  border: 1px solid #cbd7d2;
+  border-radius: 0.75rem;
+  color: var(--cohort-ink);
+  background: var(--cohort-paper);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.cohort-page__course-field select:focus-visible,
+.cohort-page button:focus-visible {
+  outline: 3px solid rgba(22, 120, 95, 0.25);
+  outline-offset: 2px;
+}
+
+.cohort-page__summary,
+.cohort-page__card,
+.cohort-page__message {
+  max-width: 1240px;
+  margin-right: auto;
+  margin-left: auto;
+  border: 1px solid var(--cohort-line);
+  border-radius: 1.15rem;
+  background: var(--cohort-paper);
+  box-shadow: 0 14px 36px rgba(24, 45, 37, 0.045);
+}
+
+.cohort-page__summary {
+  align-items: center;
+  margin-bottom: 1rem;
+  padding: 1.15rem 1.45rem;
+}
+
+.cohort-page__summary h2 {
+  margin: 0;
+  font-size: 1.12rem;
+  letter-spacing: -0.02em;
+}
+
+.cohort-page__summary p:last-child {
+  margin: 0.35rem 0 0;
+  color: var(--cohort-muted);
+  font-size: 0.83rem;
+}
+
+.cohort-page__privacy {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  max-width: 27rem;
+  color: #376252;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.cohort-page__privacy-icon {
+  display: grid;
+  width: 1.7rem;
+  height: 1.7rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--cohort-green);
+  background: var(--cohort-green-soft);
+  font-weight: 800;
+}
+
+.cohort-page__card {
+  overflow: hidden;
+  padding: 1.5rem 1.5rem 0.5rem;
+}
+
+.cohort-page__card-heading {
+  align-items: center;
+  margin: 0 0 0.65rem;
+}
+
+.cohort-page__card-heading h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  letter-spacing: -0.035em;
+}
+
+.cohort-page__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  color: var(--cohort-muted);
+  font-size: 0.74rem;
+}
+
+.cohort-page__legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.cohort-page__legend-line,
+.cohort-page__legend-deadline {
+  display: inline-block;
+  width: 1rem;
+  height: 0.18rem;
+  border-radius: 1rem;
+  background: var(--cohort-green);
+}
+
+.cohort-page__legend-deadline {
+  height: 0.8rem;
+  width: 0.15rem;
+  border-radius: 0;
+  background: var(--cohort-amber);
+}
+
+.cohort-page__chart-scroll {
+  width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-color: #c2d4cb transparent;
+  scrollbar-width: thin;
+}
+
+.cohort-page__chart-empty {
+  margin: 0.5rem 0;
+  color: var(--cohort-muted);
+  font-size: 0.8rem;
+}
+
+.cohort-page__chart {
+  display: block;
+  max-width: none;
+  overflow: visible;
+}
+
+.cohort-page__grid-line {
+  stroke: #e9efec;
+  stroke-width: 1;
+}
+
+.cohort-page__axis-label {
+  fill: #748582;
+  font-size: 11px;
+  font-weight: 550;
+}
+
+.cohort-page__deadline-line {
+  stroke: var(--cohort-amber);
+  stroke-dasharray: 4 5;
+  stroke-width: 1.6;
+  opacity: 0.82;
+}
+
+.cohort-page__deadline-dot {
+  fill: var(--cohort-paper);
+  stroke: var(--cohort-amber);
+  stroke-width: 2;
+}
+
+.cohort-page__deadline-index {
+  fill: #984d22;
+  font-size: 9px;
+  font-weight: 750;
+}
+
+.cohort-page__stress-line {
+  fill: none;
+  stroke: var(--cohort-green);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+}
+
+.cohort-page__stress-point {
+  fill: var(--cohort-paper);
+  stroke: var(--cohort-green);
+  stroke-width: 2.5;
+}
+
+.cohort-page__suppressed-mark {
+  stroke: #b8c4c0;
+  stroke-dasharray: 2 5;
+  stroke-width: 1.3;
+}
+
+.cohort-page__deadline-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.cohort-page__deadline-list li:not(.cohort-page__empty-deadlines) {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 13rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #e8e9e2;
+  border-radius: 0.75rem;
+  background: #fcfcf9;
+}
+
+.cohort-page__deadline-tag {
+  display: grid;
+  width: 1.8rem;
+  height: 1.8rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 0.55rem;
+  color: #984d22;
+  background: var(--cohort-amber-soft);
+  font-size: 0.67rem;
+  font-weight: 800;
+}
+
+.cohort-page__deadline-list li > span:nth-child(2) {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+  font-size: 0.77rem;
+}
+
+.cohort-page__deadline-list strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cohort-page__deadline-list small {
+  color: var(--cohort-muted);
+  font-size: 0.68rem;
+}
+
+.cohort-page__deadline-weight {
+  margin-left: auto;
+  color: var(--cohort-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.cohort-page__empty-deadlines {
+  padding: 0.3rem 0;
+  color: var(--cohort-muted);
+  font-size: 0.82rem;
+}
+
+.cohort-page__suppression {
+  max-width: 1240px;
+  margin: 0.9rem auto 0;
+  padding: 0.15rem 0.25rem;
+}
+
+.cohort-page__suppression-note {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0 0 0.65rem;
+  color: var(--cohort-muted);
+  font-size: 0.76rem;
+}
+
+.cohort-page__suppression-swatch {
+  width: 0.2rem;
+  height: 0.85rem;
+  border-left: 2px dashed #9baaa5;
+}
+
+.cohort-page__suppression-days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cohort-page__suppression-days li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid #dfe7e3;
+  border-radius: 999px;
+  color: #596b66;
+  background: #eef3f0;
+  font-size: 0.7rem;
+}
+
+.cohort-page__suppression-days time {
+  color: var(--cohort-ink);
+  font-weight: 700;
+}
+
+.cohort-page__message {
+  display: grid;
+  min-height: 11rem;
+  align-content: center;
+  justify-items: center;
+  gap: 0.5rem;
+  padding: 2rem;
+  text-align: center;
+}
+
+.cohort-page__message h2,
+.cohort-page__message p {
+  margin: 0;
+}
+
+.cohort-page__message p {
+  color: var(--cohort-muted);
+  font-size: 0.88rem;
+}
+
+.cohort-page__message--error p {
+  color: #9d392c;
+}
+
+.cohort-page__message button {
+  margin-top: 0.5rem;
+  padding: 0.6rem 0.95rem;
+  border: 0;
+  border-radius: 0.65rem;
+  color: white;
+  background: var(--cohort-green);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cohort-page__spinner {
+  width: 1.6rem;
+  height: 1.6rem;
+  border: 2px solid #dce9e3;
+  border-top-color: var(--cohort-green);
+  border-radius: 50%;
+  animation: cohort-spin 0.8s linear infinite;
+}
+
+@keyframes cohort-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 680px) {
+  .cohort-page__header,
+  .cohort-page__summary,
+  .cohort-page__card-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .cohort-page__header {
+    gap: 1.1rem;
+  }
+
+  .cohort-page__course-field {
+    min-width: 0;
+  }
+
+  .cohort-page__summary {
+    gap: 1rem;
+  }
+
+  .cohort-page__card {
+    padding: 1.15rem 0.9rem 0.25rem;
+  }
+
+  .cohort-page__legend {
+    gap: 0.75rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cohort-page__spinner {
+    animation-duration: 1.8s;
+  }
+}
