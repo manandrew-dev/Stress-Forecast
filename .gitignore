@@ -147,3 +147,39 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# Python virtual environments and bytecode
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Python test, tooling, and build output
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+build/
+*.egg-info/
+
+# Local databases and temporary files
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.sqlite*-journal
+*.sqlite*-shm
+*.sqlite*-wal
+*.tmp
+*.swp
+
+# Local service credentials
+.pgpass
+*.pem
+*.key
