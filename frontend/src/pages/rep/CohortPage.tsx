@@ -1,11 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
+import { LineChart } from "lucide-react";
 import { useMemo } from "react";
 
 import { api, qk } from "@/api/client";
 import type { CohortResponse } from "@/api/types";
 import { ChartLegend, TimelineChart } from "@/components/charts/TimelineChart";
 import { PageHeader } from "@/components/PageHeader";
-import { ErrorState, LoadingBlock } from "@/components/StateViews";
+import { EmptyState, ErrorState, LoadingBlock } from "@/components/StateViews";
 import { Card } from "@/components/ui/card";
 import { useCourseMap } from "@/components/useCourseMap";
 import { deadlineMarks, fillTimeline, suppressedRanges, toCohortSeries } from "@/lib/chart-series";
@@ -36,6 +37,16 @@ function CohortView({ data }: { data: CohortResponse }) {
       suppressedCount: series.filter((p) => p.suppressed).length,
     };
   }, [data]);
+
+  // Nothing to plot yet (no days, or every day under the 5-student minimum).
+  if (view.peak === null) {
+    return (
+      <EmptyState icon={LineChart} title="No check-in data yet">
+        The class average shows up once at least {data.min_students} students have checked in on the
+        same day.
+      </EmptyState>
+    );
+  }
 
   return (
     <>
