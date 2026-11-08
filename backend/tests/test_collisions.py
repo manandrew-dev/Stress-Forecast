@@ -215,3 +215,38 @@ def test_cross_course_peak_matches_rep_collisions():
 
 def test_cross_course_uses_cohort_min_from_config():
     assert COHORT_MIN == 5  # the router passes config.COHORT_MIN; never a literal
+
+
+# --- heads-up nudge: only upcoming deadlines, named with the course code ---
+
+DEMO_WEEK9 = [
+    d("2026-11-03", 20, "Midterm 2", course_id=1),
+    d("2026-11-05", 25, "Midterm 2", course_id=2),
+    d("2026-11-07", 10, "Quiz 4", course_id=1),
+]
+CODES = {1: "CPSC 210", 2: "MATH 200"}
+
+
+def test_nudge_skips_deadlines_already_past():
+    [c] = find_collisions(DEMO_WEEK9)
+    assert heads_up_message(c, dt.date(2026, 11, 7), CODES) == "3 assessments worth 55% in 5 days. Start CPSC 210 Quiz 4 early."
+
+
+def test_nudge_includes_deadlines_due_today():
+    [c] = find_collisions(DEMO_WEEK9)
+    assert heads_up_message(c, dt.date(2026, 11, 5), CODES).endswith("Start MATH 200 Midterm 2 early.")
+
+
+def test_nudge_left_out_when_everything_is_past():
+    [c] = find_collisions(DEMO_WEEK9)
+    assert heads_up_message(c, dt.date(2026, 11, 8), CODES) == "3 assessments worth 55% in 5 days."
+
+
+def test_nudge_without_codes_falls_back_to_title():
+    [c] = find_collisions(DEMO_WEEK9)
+    assert heads_up_message(c, dt.date(2026, 11, 7)).endswith("Start Quiz 4 early.")
+
+
+def test_heads_up_passes_today_and_codes():
+    [c] = heads_up(DEMO_WEEK9, dt.date(2026, 11, 7), CODES)
+    assert c.message.endswith("Start CPSC 210 Quiz 4 early.")

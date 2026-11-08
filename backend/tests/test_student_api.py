@@ -330,3 +330,16 @@ def test_update_deadline_deleted_mid_request(as_user, db):
     db.on("SELECT created_by FROM deadlines", {"created_by": STUDENT.id})  # owned, but UPDATE matched nothing
     body = {"title": "X", "due_date": "2026-10-14", "weight_pct": 5, "type": "quiz"}
     check_error(as_user(STUDENT).put("/api/deadlines/7", json=body), 404, "not_found")
+
+
+def test_heads_up_on_demo_day_names_the_upcoming_deadline(as_user, db, monkeypatch):
+    monkeypatch.setattr(localtime, "today", lambda: dt.date(2026, 11, 7))
+    db.on("FROM enrollments WHERE user_id", [{"course_id": 1}, {"course_id": 2}])
+    db.on("FROM courses WHERE id = ANY", [{"id": 1, "code": "DEMO CPSC 210"}, {"id": 2, "code": "DEMO MATH 200"}])
+    db.on("(created_by IS NULL) DESC", [
+        deadline_row(1, "Midterm 2", "2026-11-03", 20, kind="midterm"),
+        deadline_row(2, "Midterm 2", "2026-11-05", 25, course_id=2, kind="midterm"),
+        deadline_row(3, "Quiz 4", "2026-11-07", 10, kind="quiz"),
+    ])
+    [c] = as_user(STUDENT).get("/api/me/heads-up").json()["collisions"]
+    assert c["message"] == "3 assessments worth 55% in 5 days. Start DEMO CPSC 210 Quiz 4 early."

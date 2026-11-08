@@ -10,7 +10,7 @@ toward the assessment count but contribute 0 to the total weight, so
 """
 
 import datetime as dt
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 
 from ..config import (
     COLLISION_MIN_COUNT,
@@ -168,21 +168,32 @@ def cross_course_rep_collisions(
     return result
 
 
-def heads_up(deadlines: Sequence[Deadline], today: dt.date) -> list[HeadsUpCollision]:
+def heads_up(
+    deadlines: Sequence[Deadline],
+    today: dt.date,
+    course_codes: Mapping[int, str] | None = None,
+) -> list[HeadsUpCollision]:
     """Collisions overlapping the next HEADS_UP_DAYS days, with a short message.
 
-    Pass every deadline across the student's courses and the student's local date.
+    Pass every deadline across the student's courses, the student's local date, and
+    course codes so the nudge can say which course it means.
     """
     horizon_end = today + dt.timedelta(days=HEADS_UP_DAYS - 1)
     return [
-        HeadsUpCollision(**window.model_dump(), message=heads_up_message(window))
+        HeadsUpCollision(**window.model_dump(), message=heads_up_message(window, today, course_codes))
         for window in find_collisions(deadlines)
         if window.end >= today and window.start <= horizon_end
     ]
 
 
-def heads_up_message(window: CollisionWindow) -> str:
-    """Deterministic one-line summary plus a nudge to start the heaviest item."""
+def heads_up_message(
+    window: CollisionWindow,
+    today: dt.date | None = None,
+    course_codes: Mapping[int, str] | None = None,
+) -> str:
+    """Deterministic one-line summary plus a nudge to start the heaviest deadline that is
+    still ahead (due on or after ``today``), named with its course code when known.
+    The nudge is left out when nothing in the window is still ahead."""
     days = (window.end - window.start).days + 1
     count = window.deadline_count
     noun = "assessment" if count == 1 else "assessments"
@@ -196,8 +207,11 @@ def heads_up_message(window: CollisionWindow) -> str:
     else:
         summary = f"{count} {noun} worth {weight} in {days} days."
 
-    heaviest = max(
-        window.deadlines,
-        key=lambda d: (d.weight_pct or 0, -d.due_date.toordinal()),
-    )
-    return f"{summary} Start {heaviest.title} early."
+    upcoming = [d for d in window.deadlines if today is None or d.due_date >= today]
+    if not upcoming:
+        return summary
+    # Heaviest still-upcoming item; ties go to the earliest due date.
+    heaviest = max(upcoming, key=lambda d: (d.weight_pct or 0, -d.due_date.toordinal()))
+    code = (course_codes or {}).get(heaviest.course_id)
+    name = f"{code} {heaviest.title}" if code else heaviest.title
+    return f"{summary} Start {name} early."
