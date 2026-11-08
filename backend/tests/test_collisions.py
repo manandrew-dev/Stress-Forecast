@@ -151,3 +151,67 @@ def test_mixed_courses_for_student_combination():
     deadlines = [d("2026-11-09", course_id=1), d("2026-11-10", course_id=2), d("2026-11-11", course_id=3)]
     [c] = find_collisions(deadlines)
     assert {x.course_id for x in c.deadlines} == {1, 2, 3}
+
+
+# --- cross-course rep collisions (mirrors frontend/src/test/cross-course-collisions.test.ts) ---
+
+from app.config import COHORT_MIN  # noqa: E402
+from app.services.collisions import cross_course_rep_collisions, shared_course_ids  # noqa: E402
+
+# Course 1 is the rep's course. Five students per combination (four take 1 + 4).
+STUDENTS = [[1, 2]] * 5 + [[1, 3]] * 5 + [[1, 4]] * 4 + [[2, 3]] * 5
+
+
+def test_shared_courses_use_the_threshold():
+    # Course 4 has only 4 of course 1's students, so it isn't shared; [2, 3] students aren't in course 1.
+    assert shared_course_ids(1, STUDENTS, 5) == [2, 3]
+
+
+def test_shared_courses_ignore_duplicate_ids_and_other_students():
+    assert shared_course_ids(1, [[1, 2, 2]] * 5 + [[2, 3]] * 9, 5) == [2]
+
+
+def test_cross_course_pile_up_counts_who_it_affects():
+    deadlines = [d("2026-11-03", 20, course_id=1), d("2026-11-05", 25, course_id=2)]
+    [c] = cross_course_rep_collisions(1, deadlines, STUDENTS, [], 5)
+    assert (c.deadline_count, c.total_weight_pct, c.students_affected) == (2, 45, 5)
+
+
+def test_pile_ups_without_an_own_deadline_are_dropped():
+    deadlines = [d("2026-10-01", 10, course_id=1), d("2026-11-05", 25, course_id=2), d("2026-11-06", 25, course_id=3)]
+    assert cross_course_rep_collisions(1, deadlines, STUDENTS, [], 5) == []
+
+
+def test_non_shared_courses_are_left_out():
+    deadlines = [d("2026-11-03", 20, course_id=1), d("2026-11-04", 30, course_id=4)]
+    assert cross_course_rep_collisions(1, deadlines, STUDENTS, [], 5) == []
+
+
+def test_pile_ups_affecting_fewer_than_the_minimum_are_hidden():
+    deadlines = [d("2026-11-03", 20, course_id=1), d("2026-11-05", 25, course_id=2)]
+    assert cross_course_rep_collisions(1, deadlines, STUDENTS, [], 6) == []
+
+
+def test_single_course_pile_up_counts_the_whole_class():
+    deadlines = [d("2026-11-03", 20, course_id=1), d("2026-11-05", 25, course_id=1)]
+    [c] = cross_course_rep_collisions(1, deadlines, STUDENTS, [], 5)
+    assert c.students_affected == 14
+
+
+def test_affected_counts_overlapping_own_collisions_only():
+    # Students in 1+3 see their own 3-item pile-up overlapping; 1+2 students only have two 10% items.
+    deadlines = [d("2026-11-03", 10, course_id=1), d("2026-11-04", 10, course_id=2),
+                 d("2026-11-05", 10, course_id=3), d("2026-11-06", 10, course_id=3)]
+    [c] = cross_course_rep_collisions(1, deadlines, STUDENTS, [], 5)
+    assert c.deadline_count == 4 and c.students_affected == 5
+
+
+def test_cross_course_peak_matches_rep_collisions():
+    deadlines = [d("2026-11-03", 20, course_id=1), d("2026-11-05", 25, course_id=2)]
+    daily = [(dt.date(2026, 10, 30), 9.9), (dt.date(2026, 10, 31), 7.0), (dt.date(2026, 11, 4), 7.5)]
+    [c] = cross_course_rep_collisions(1, deadlines, STUDENTS, daily, 5)
+    assert (c.peak_avg_stress, c.peak_date) == (7.5, dt.date(2026, 11, 4))
+
+
+def test_cross_course_uses_cohort_min_from_config():
+    assert COHORT_MIN == 5  # the router passes config.COHORT_MIN; never a literal

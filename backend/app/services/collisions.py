@@ -23,6 +23,15 @@ from ..models import CollisionWindow, Deadline, HeadsUpCollision, RepCollision
 
 # One non-suppressed day of cohort stress: (date, avg_stress).
 DailyStress = tuple[dt.date, float]
+# One student's enrolled course ids (no user id).
+CourseSet = Sequence[int]
+
+
+class PeakCollision(CollisionWindow):
+    """A collision window with the nearby cohort stress peak (no student count)."""
+
+    peak_avg_stress: float | None
+    peak_date: dt.date | None
 
 
 def _known_weight(deadlines: Iterable[Deadline]) -> float:
@@ -79,8 +88,8 @@ def find_collisions(deadlines: Sequence[Deadline]) -> list[CollisionWindow]:
 def rep_collisions(
     deadlines: Sequence[Deadline],
     daily_stress: Sequence[DailyStress],
-) -> list[RepCollision]:
-    """Collisions for one course, each with the nearby cohort stress peak.
+) -> list[PeakCollision]:
+    """Collisions over the given deadlines, each with the nearby cohort stress peak.
 
     ``daily_stress`` must contain only non-suppressed days (n_students >=
     COHORT_MIN). The peak is searched from COLLISION_PEAK_LOOKBACK_DAYS before
@@ -97,12 +106,65 @@ def rep_collisions(
         ]
         peak = max(nearby, key=lambda p: (p[1], -p[0].toordinal()), default=None)
         result.append(
-            RepCollision(
+            PeakCollision(
                 **window.model_dump(),
                 peak_avg_stress=peak[1] if peak else None,
                 peak_date=peak[0] if peak else None,
             )
         )
+    return result
+
+
+def shared_course_ids(course_id: int, students: Sequence[CourseSet], min_students: int) -> list[int]:
+    """Other courses at least ``min_students`` of this course's students also take.
+
+    ``students`` holds one list of course ids per student; students not in
+    ``course_id`` are ignored.
+    """
+    counts: dict[int, int] = {}
+    for courses in students:
+        if course_id not in courses:
+            continue
+        for other in set(courses) - {course_id}:
+            counts[other] = counts.get(other, 0) + 1
+    return sorted(c for c, n in counts.items() if n >= min_students)
+
+
+def cross_course_rep_collisions(
+    course_id: int,
+    deadlines: Sequence[Deadline],
+    students: Sequence[CourseSet],
+    daily_stress: Sequence[DailyStress],
+    min_students: int,
+) -> list[RepCollision]:
+    """Rep collisions across the courses a class shares (docs/architecture.md §7).
+
+    1. Run the rule over this course's deadlines plus its shared courses' deadlines.
+    2. Keep windows that contain at least one of this course's own deadlines.
+    3. ``students_affected``: this course's students whose own-courses collisions overlap
+       the window; windows under ``min_students`` are dropped (privacy).
+    4. Peak stress exactly as in ``rep_collisions`` (``daily_stress`` must be this
+       course's non-suppressed days).
+
+    Only counts are returned; no per-student data.
+    """
+    cohort = [set(courses) for courses in students if course_id in courses]
+    pool_courses = {course_id, *shared_course_ids(course_id, students, min_students)}
+    pool = [d for d in deadlines if d.course_id in pool_courses]
+
+    result = []
+    for window in rep_collisions(pool, daily_stress):
+        if not any(d.course_id == course_id for d in window.deadlines):
+            continue
+        affected = sum(
+            any(
+                w.start <= window.end and w.end >= window.start
+                for w in find_collisions([d for d in pool if d.course_id in courses])
+            )
+            for courses in cohort
+        )
+        if affected >= min_students:
+            result.append(RepCollision(**window.model_dump(), students_affected=affected))
     return result
 
 

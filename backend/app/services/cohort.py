@@ -3,6 +3,9 @@
 This is the only module that reads ``daily_course_stress``, and every query filters
 ``n_students >= COHORT_MIN`` in SQL, so suppressed values never leave the database.
 Days without a visible row are returned as suppressed (all-null) entries.
+
+It also reads enrollments for the cross-course rep view, but only as anonymous lists of
+course ids (one per student); user ids are never selected.
 """
 
 import datetime as dt
@@ -26,6 +29,26 @@ ORDER BY day
 """
 
 Executor = asyncpg.Pool | asyncpg.Connection
+
+
+_COURSE_SETS_SQL = """
+SELECT array_agg(e.course_id ORDER BY e.course_id) AS course_ids
+FROM enrollments AS e
+WHERE e.user_id IN (SELECT user_id FROM enrollments WHERE course_id = $1)
+GROUP BY e.user_id
+"""
+
+
+async def cohort_course_sets(db: Executor, course_id: int) -> list[list[int]]:
+    """Each enrolled student's course ids, one list per student, for shared-course and
+    students-affected counts. User ids are grouped away in SQL and never selected, so they
+    can't leave this query. ``len()`` of the result is the cohort size."""
+    return [list(r["course_ids"]) for r in await db.fetch(_COURSE_SETS_SQL, course_id)]
+
+
+async def course_codes(db: Executor, course_ids) -> dict[int, str]:
+    rows = await db.fetch("SELECT id, code FROM courses WHERE id = ANY($1::int[])", list(course_ids))
+    return {r["id"]: r["code"] for r in rows}
 
 
 async def get_course(db: Executor, course_id: int) -> Course | None:
