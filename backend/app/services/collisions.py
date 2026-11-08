@@ -3,8 +3,9 @@
 Pure functions with no database access, so they can be tested with plain lists.
 
 A collision is a COLLISION_WINDOW_DAYS-day window holding at least
-COLLISION_MIN_COUNT assessments, or assessments whose known weights add up to at
-least COLLISION_MIN_WEIGHT percent. Deadlines with ``weight_pct = None`` count
+COLLISION_MIN_COUNT assessments, or at least COLLISION_WEIGHT_MIN_COUNT assessments
+whose known weights add up to at least COLLISION_MIN_WEIGHT percent (one heavy
+assessment alone is not a pile-up). Deadlines with ``weight_pct = None`` count
 toward the assessment count but contribute 0 to the total weight, so
 ``total_weight_pct`` is a lower bound whenever a weight is unknown.
 """
@@ -16,6 +17,7 @@ from ..config import (
     COLLISION_MIN_COUNT,
     COLLISION_MIN_WEIGHT,
     COLLISION_PEAK_LOOKBACK_DAYS,
+    COLLISION_WEIGHT_MIN_COUNT,
     COLLISION_WINDOW_DAYS,
     HEADS_UP_DAYS,
 )
@@ -39,9 +41,9 @@ def _known_weight(deadlines: Iterable[Deadline]) -> float:
 
 
 def _is_collision(deadlines: Sequence[Deadline]) -> bool:
-    return (
-        len(deadlines) >= COLLISION_MIN_COUNT
-        or _known_weight(deadlines) >= COLLISION_MIN_WEIGHT
+    return len(deadlines) >= COLLISION_MIN_COUNT or (
+        len(deadlines) >= COLLISION_WEIGHT_MIN_COUNT
+        and _known_weight(deadlines) >= COLLISION_MIN_WEIGHT
     )
 
 

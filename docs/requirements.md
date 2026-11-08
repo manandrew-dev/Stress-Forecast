@@ -57,7 +57,7 @@ Priority: **P0** = must work in the demo. **P1** = should have. **P2** = only if
 ## 4. Definitions
 
 - **Stress score:** integer 1–10 from Gemini (1 = calm, 10 = overwhelmed).
-- **Collision:** any 5-day window containing **3 or more** assessments, **or** assessments with combined weight **≥ 40%**. Both numbers are constants in the backend config, not hard-coded in multiple places. Which deadlines count depends on who is looking:
+- **Collision:** any 5-day window containing **3 or more** assessments, **or** **2 or more** assessments with combined weight **≥ 40%**. A single heavy assessment (e.g. a 50% final) on its own is not a collision; it takes a pile-up. The numbers are constants in the backend config, not hard-coded in multiple places. Which deadlines count depends on who is looking:
   - **Student heads-up:** the deadlines of the student's own courses.
   - **Rep view:** the course's deadlines plus its shared courses' deadlines, keeping only windows that include at least one of the course's own deadlines (see `docs/api.md`, collisions).
 - **Shared course:** for a given course, any other course that at least 5 of its students are also enrolled in.

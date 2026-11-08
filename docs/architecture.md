@@ -203,7 +203,7 @@ Rules: never send names, emails, or user ids to Gemini. The weekly report gets o
 The rule (both views):
 
 1. Slide a 5-day window across the term.
-2. Flag the window if it holds `>= COLLISION_MIN_COUNT` (3) assessments **or** combined weight `>= COLLISION_MIN_WEIGHT` (40%).
+2. Flag the window if it holds `>= COLLISION_MIN_COUNT` (3) assessments, **or** at least `COLLISION_WEIGHT_MIN_COUNT` (2) assessments with combined weight `>= COLLISION_MIN_WEIGHT` (40%). One heavy assessment alone never counts.
 3. Merge overlapping flagged windows.
 
 Which deadlines go in:
