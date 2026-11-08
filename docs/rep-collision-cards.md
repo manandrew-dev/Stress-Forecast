@@ -2,6 +2,8 @@
 
 How the rep's **Pile-ups** page (`frontend/src/pages/rep/CollisionsPage.tsx`) shows each collision. Which windows count as a collision is decided by the backend (`docs/requirements.md` §4); this page only covers how they're displayed.
 
+> **Sample data vs the real backend:** the backend flags a 5-day window with 3+ assessments or 40%+ combined weight (`backend/app/config.py`). The sample data in `frontend/src/mocks/collisions.ts` uses a looser rule (2+ assessments and 30%+), so some demo cards, like Oct 6–8 (2 assessments, 35%), only appear with sample data. It also searches one extra day past the window for the stress peak.
+
 ## What a card shows
 
 ```
@@ -17,7 +19,7 @@ Nearby stress peak: 8.8 on Nov 3
 - **Avg per course:** see below.
 - **Course chips:** each course's share of its own grade in this window.
 - **Deadline list:** every assessment in the window.
-- **Nearby stress peak:** the highest daily class average from 3 days before the window to 1 day after.
+- **Nearby stress peak:** the highest daily class average from 3 days before the window to its last day (`COLLISION_PEAK_LOOKBACK_DAYS` in `backend/app/config.py`). Ties go to the earliest day.
 
 ## Avg per course
 
@@ -47,8 +49,8 @@ The average makes a pile-up spread across several courses look smaller (the demo
 | Situation | Card says |
 | --- | --- |
 | Peak found | "Nearby stress peak: 8.8 on Nov 3" |
-| Window already started, but too few check-ins nearby | "Nearby stress peak: Not enough responses" |
-| Window hasn't started yet | "Still ahead — no check-ins for these days yet." |
+| Window started before today, but too few check-ins nearby | "Nearby stress peak: Not enough responses" |
+| Window starts today or later, with no peak yet | "Still ahead — no check-ins for these days yet." |
 
 "Too few check-ins" means fewer than 5 students on every nearby day, so those days are hidden for privacy.
 

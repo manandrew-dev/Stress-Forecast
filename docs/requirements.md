@@ -49,7 +49,7 @@ Priority: **P0** = must work in the demo. **P1** = should have. **P2** = only if
 | R1 | P0 | Log in with rep role | Rep lands on the cohort view, not the student app |
 | R2 | P0 | Cohort view for a course | Daily average stress over the term with all course deadlines marked on the same timeline |
 | R3 | P0 | Privacy threshold | Any day with fewer than **5** students is returned as suppressed and shown as "Not enough responses" |
-| R4 | P0 | Collision flags | List of windows where deadlines pile up, with combined weight and the stress peak nearby |
+| R4 | P0 | Collision flags | List of windows where deadlines pile up, with each course's share, the average weight per course (see `docs/rep-collision-cards.md`), and the stress peak nearby |
 | R5 | P1 | Weekly Gemini report | Plain-language summary of the week + one concrete suggested fix |
 | R6 | P2 | Databricks insights | Shows findings written by the Databricks notebook (e.g. "assessments worth 40%+ within 5 days precede spikes") |
 | R7 | P2 | MFA for reps | Auth0 requires MFA when a rep logs in |

@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { api } from "@/api/client";
+import { CollisionCard } from "@/components/CollisionCard";
 import type { CollisionsResponse, Course, Deadline } from "@/api/types";
 import { averageCourseWeight, weightByCourse } from "@/lib/weights";
 import { CollisionsPage } from "@/pages/rep/CollisionsPage";
@@ -170,6 +171,28 @@ describe("rep collision flags", () => {
 
     expect(await screen.findByText(/Still ahead/)).toBeInTheDocument();
     expect(screen.queryByText(/Not enough responses/)).not.toBeInTheDocument();
+  });
+});
+
+describe("collision card peak message", () => {
+  const base = {
+    end: "2026-11-20",
+    deadlineCount: 3,
+    totalWeight: 50,
+    deadlines: [],
+    courses: new Map<number, Course>(),
+    peak: { value: null, date: null },
+    today: "2026-11-16",
+  };
+
+  it("says still ahead for a pile-up that starts today", () => {
+    render(<CollisionCard {...base} start="2026-11-16" />);
+    expect(screen.getByText(/Still ahead/)).toBeInTheDocument();
+  });
+
+  it("says not enough responses for a pile-up that started before today", () => {
+    render(<CollisionCard {...base} start="2026-11-15" />);
+    expect(screen.getByText(/Not enough responses/)).toBeInTheDocument();
   });
 });
 

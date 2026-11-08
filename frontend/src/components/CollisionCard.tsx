@@ -28,7 +28,7 @@ export function CollisionCard({
   courses: Map<number, Course>;
   footer?: ReactNode;
   peak?: { value: number | null; date: string | null };
-  /** Local "YYYY-MM-DD"; a pile-up starting after it has no check-ins yet. */
+  /** Local "YYYY-MM-DD"; a pile-up starting on or after it is still ahead. */
   today?: string;
   /**
    * Show each course's share and the average per course instead of one combined
@@ -95,7 +95,7 @@ export function CollisionCard({
               Nearby stress peak: <StressDot value={peak.value} className="mx-1 align-middle" />
               <strong className="font-semibold">{peak.value}</strong> on {shortDate(peak.date)}
             </span>
-          ) : start > today ? (
+          ) : start >= today ? (
             <span className="text-muted-foreground">
               Still ahead — no check-ins for these days yet.
             </span>
