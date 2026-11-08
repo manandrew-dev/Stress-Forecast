@@ -2,11 +2,11 @@
 
 Use the team's Auth0 tenant and a development Tiger Data database. A tenant administrator can complete the following steps in the Auth0 Dashboard.
 
-1. Under **Applications → APIs**, create the Stress Forecast API. Set the identifier to `https://api.stressforecast.app` and the signing algorithm to `RS256`. In the API settings, enable **RBAC**. Use signed JWT access tokens for the API.
+1. Under **Applications → APIs**, create the Stress Forecast API. Set the identifier to `https://api.stressforecast.app` and the signing algorithm to `RS256`. In the API settings, enable **RBAC** and **Allow Offline Access** (the frontend uses refresh tokens). Use signed JWT access tokens for the API.
 2. Under **User Management → Roles**, create the tenant roles `student` and `rep`.
 3. Under **Actions → Library**, create a custom **Login / Post Login** Action. Paste the code below, save it, and deploy it. Under **Actions → Triggers → post-login**, add the Action to the login flow and apply the change.
 4. Under **User Management → Users**, create two demo users in the database connection used by the frontend application. On each user's **Roles** tab, assign exactly one application role. Assign `student` to the student demo user and `rep` to the representative demo user. Share their credentials privately.
-5. Configure the frontend's Auth0 **Single Page Application** with the actual callback URL, logout URL, and web origin for the frontend. For local development the Vite origin is `http://localhost:5173`. Set `VITE_AUTH0_DOMAIN` to the login hostname, `VITE_AUTH0_CLIENT_ID` to the SPA's Client ID, and `VITE_AUTH0_AUDIENCE` to the API identifier. Request an access token with that audience.
+5. Configure the frontend's Auth0 **Single Page Application** with the actual callback URL, logout URL, and web origin for the frontend, and enable **Refresh Token Rotation** so sessions survive reloads. For local development the Vite origin is `http://localhost:5173`. Set `VITE_AUTH0_DOMAIN` to the login hostname, `VITE_AUTH0_CLIENT_ID` to the SPA's Client ID, and `VITE_AUTH0_AUDIENCE` to the API identifier. Request an access token with that audience.
 6. Set `AUTH0_DOMAIN` in the backend environment to the same login hostname, and `AUTH0_AUDIENCE` to `https://api.stressforecast.app`. The issuer must match `https://<AUTH0_DOMAIN>/`. Set `DATABASE_URL` for the database with the Issue #14 schema applied. The existing [environment example](../backend/.env.example) lists the variables.
 
 ## Post-Login Action

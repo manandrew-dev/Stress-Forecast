@@ -33,7 +33,11 @@ function getClient(): Promise<Auth0Client> {
   return clientPromise;
 }
 
-/** Reads the role from an access token's roles claim. Routing only; the API enforces roles. */
+/**
+ * Reads the role from an access token's roles claim. Routing only; the API enforces roles.
+ * Same rule as backend/app/auth.py: exactly ["student"] or ["rep"], anything else is no role
+ * (the API answers 403), so we never route someone to a view the API would refuse.
+ */
 export function roleFromAccessToken(token: string): Role | null {
   try {
     const payload = token.split(".")[1];
@@ -43,10 +47,8 @@ export function roleFromAccessToken(token: string): Role | null {
       atob(base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), "=")),
     );
     const roles: unknown = claims[ROLES_CLAIM];
-    if (!Array.isArray(roles)) return null;
-    if (roles.includes("rep")) return "rep";
-    if (roles.includes("student")) return "student";
-    return null;
+    if (!Array.isArray(roles) || roles.length !== 1) return null;
+    return roles[0] === "student" || roles[0] === "rep" ? roles[0] : null;
   } catch {
     return null;
   }
@@ -65,8 +67,12 @@ export function startAuth0(): void {
       const params = new URLSearchParams(window.location.search);
       let justLoggedIn = false;
       if (params.has("state") && (params.has("code") || params.has("error"))) {
-        await client.handleRedirectCallback();
-        window.history.replaceState(null, "", window.location.pathname);
+        try {
+          await client.handleRedirectCallback();
+        } finally {
+          // Drop ?code/?error/&state from the address bar, even when the login failed.
+          window.history.replaceState(null, "", window.location.pathname);
+        }
         justLoggedIn = true;
       }
 
