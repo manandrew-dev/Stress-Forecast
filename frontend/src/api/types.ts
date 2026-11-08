@@ -146,6 +146,12 @@ export interface InsightsResponse {
   insights: Insight[];
 }
 
+/** Optional `from` / `to` query filter, both "YYYY-MM-DD". Omitted = the backend's default (current term). */
+export interface DateRange {
+  from?: string;
+  to?: string;
+}
+
 export interface ApiErrorBody {
   error: { code: string; message: string };
 }

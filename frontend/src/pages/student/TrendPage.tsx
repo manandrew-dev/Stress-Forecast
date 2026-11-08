@@ -27,7 +27,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 export function TrendPage() {
   const { user } = useAuth();
   const courses = useCourseMap();
-  const q = useQuery({ queryKey: qk.trend(user?.id ?? "anon"), queryFn: api.getMyTrend });
+  const q = useQuery({ queryKey: qk.trend(user?.id ?? "anon"), queryFn: () => api.getMyTrend() });
 
   const chart = useMemo(() => {
     const first = q.data?.points[0];
@@ -50,7 +50,10 @@ export function TrendPage() {
       avg7: last7.reduce((s, p) => s + p.stress, 0) / Math.max(1, last7.length),
       sleep7: sleeps.length ? sleeps.reduce((a, b) => a + b, 0) / sleeps.length : null,
       checkins: points.length,
-      upcoming: deadlines.filter((d) => d.due_date > today).sort((a, b) => a.due_date.localeCompare(b.due_date)).slice(0, 4),
+      upcoming: deadlines
+        .filter((d) => d.due_date > today)
+        .sort((a, b) => a.due_date.localeCompare(b.due_date))
+        .slice(0, 4),
     };
   }, [q.data]);
 
@@ -81,7 +84,10 @@ export function TrendPage() {
         <>
           <div className="grid grid-cols-3 gap-3">
             <Stat label="Avg stress, last 7 days" value={chart.avg7.toFixed(1)} />
-            <Stat label="Avg sleep, last 7 days" value={chart.sleep7 === null ? "—" : `${chart.sleep7.toFixed(1)}h`} />
+            <Stat
+              label="Avg sleep, last 7 days"
+              value={chart.sleep7 === null ? "—" : `${chart.sleep7.toFixed(1)}h`}
+            />
             <Stat label="Check-ins" value={String(chart.checkins)} />
           </div>
           <Card className="p-4 sm:p-6">
