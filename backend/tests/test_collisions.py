@@ -250,3 +250,32 @@ def test_nudge_without_codes_falls_back_to_title():
 def test_heads_up_passes_today_and_codes():
     [c] = heads_up(DEMO_WEEK9, dt.date(2026, 11, 7), CODES)
     assert c.message.endswith("Start CPSC 210 Quiz 4 early.")
+
+
+# --- weight rule needs a pile-up (>= COLLISION_WEIGHT_MIN_COUNT assessments) ---
+
+
+def test_single_heavy_final_is_not_a_collision():
+    assert find_collisions([d("2026-12-14", 50, "Final Exam")]) == []
+    assert find_collisions([d("2026-12-14", 100, "Final Exam")]) == []
+
+
+def test_two_assessments_reaching_the_weight_threshold_still_collide():
+    [c] = find_collisions([d("2026-12-10", 20), d("2026-12-12", 20)])
+    assert (c.deadline_count, c.total_weight_pct) == (2, 40)
+
+
+def test_lone_heavy_final_no_longer_stretches_a_window():
+    # Finals week in the seed: CPSC 20% (Dec 10), PHYS 35% (Dec 12), MATH 40% (Dec 14).
+    finals = [d("2026-12-10", 20, course_id=1), d("2026-12-12", 35, course_id=3), d("2026-12-14", 40, course_id=2)]
+    [c] = find_collisions(finals)
+    assert (c.start, c.end) == (dt.date(2026, 12, 10), dt.date(2026, 12, 16))  # was Dec 18
+
+
+def test_lone_heavy_assessment_gives_no_heads_up():
+    assert heads_up([d("2026-11-10", 45, "Research Essay")], dt.date(2026, 11, 7)) == []
+
+
+def test_lone_heavy_assessment_is_not_a_rep_pile_up():
+    students = [[1]] * 20
+    assert cross_course_rep_collisions(1, [d("2026-12-04", 40, "Research Essay", course_id=1)], students, [], 5) == []
