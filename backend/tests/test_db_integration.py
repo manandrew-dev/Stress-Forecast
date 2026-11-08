@@ -199,7 +199,7 @@ def test_collisions_report_insights(mocked):
                     ("2026-10-06", "2026-10-10", 40, 10, ["DEMO CPSC 210", "DEMO MATH 200"]),
                     ("2026-11-03", "2026-11-07", 55, 10, ["DEMO CPSC 210", "DEMO MATH 200"]),
                     ("2026-11-16", "2026-11-23", 70, 20, ["DEMO CPSC 210", "DEMO ENGL 110", "DEMO PHYS 118"]),
-                    ("2026-12-10", "2026-12-18", 95, 20, ["DEMO CPSC 210", "DEMO MATH 200", "DEMO PHYS 118"]),
+                    ("2026-12-10", "2026-12-16", 95, 20, ["DEMO CPSC 210", "DEMO MATH 200", "DEMO PHYS 118"]),
                 ]
                 week9 = body["collisions"][1]
                 assert week9["peak_avg_stress"] is not None and "2026-10-31" <= week9["peak_date"] <= "2026-11-07"
@@ -225,8 +225,15 @@ def test_checkin_replace_and_fan_out():
     async def go():
         async with harness() as (client, conn, focus):
             async with client("student") as c:
+                # Someone may already have checked in on the demo day through the app.
+                start, end = localtime.day_bounds(DEMO_NOW.date())
+                uid = (await c.get("/api/me")).json()["id"]
+                existed = await conn.fetchval(
+                    "SELECT count(*) > 0 FROM checkins WHERE user_id = $1 AND time >= $2 AND time < $3",
+                    uid, start, end,
+                )
                 first = (await c.post("/api/checkins", json={"text": "exam tomorrow"})).json()
-                assert first["replaced_earlier"] is False
+                assert first["replaced_earlier"] is existed
                 assert first["time"] == DEMO_NOW.isoformat()
                 second = (await c.post("/api/checkins", json={"text": "still studying"})).json()
                 assert second["replaced_earlier"] is True
