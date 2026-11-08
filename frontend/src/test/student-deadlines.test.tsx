@@ -78,9 +78,12 @@ describe("deadlines page", () => {
     expect(within(later).getByText("Project Phase 3")).toBeInTheDocument();
     expect(within(later).getByText("Final Exam")).toBeInTheDocument();
 
-    // 3 upcoming, 10 + 25 + 40 = 75% still ahead; the two Midterm 2s are past
-    expect(screen.getByText("3")).toBeInTheDocument();
-    expect(screen.getByText("75%")).toBeInTheDocument();
+    // 3 upcoming; still ahead per course (weights are shares of each course's own grade):
+    // CPSC 210 Quiz 4 + Project Phase 3 = 35%, MATH 200 Final Exam = 40%. Never summed across courses.
+    const summary = screen.getByText(/upcoming/).closest("p")!;
+    expect(summary).toHaveTextContent(
+      "3 upcoming · still ahead: DEMO CPSC 210 35% · DEMO MATH 200 40%",
+    );
     expect(screen.queryByRole("heading", { name: "Past" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /show 2 past deadlines/i }));
@@ -93,6 +96,9 @@ describe("deadlines page", () => {
     fireEvent.click(await screen.findByRole("button", { name: "DEMO MATH 200" }));
     expect(screen.queryByText("Quiz 4")).not.toBeInTheDocument();
     expect(screen.getByText("Final Exam")).toBeInTheDocument();
+    expect(screen.getByText(/upcoming/).closest("p")!).toHaveTextContent(
+      "1 upcoming · 40% of DEMO MATH 200’s grade still ahead",
+    );
     expect(screen.getByRole("button", { name: "DEMO MATH 200" })).toHaveAttribute(
       "aria-pressed",
       "true",
