@@ -16,6 +16,7 @@ export function CollisionCard({
   courses,
   footer,
   peak,
+  today = new Date().toLocaleDateString("en-CA"),
 }: {
   start: string;
   end: string;
@@ -25,6 +26,8 @@ export function CollisionCard({
   courses: Map<number, Course>;
   footer?: ReactNode;
   peak?: { value: number | null; date: string | null };
+  /** Local "YYYY-MM-DD"; a pile-up starting after it has no check-ins yet. */
+  today?: string;
 }) {
   return (
     <Card className="animate-rise overflow-hidden">
@@ -59,8 +62,12 @@ export function CollisionCard({
               Nearby stress peak: <StressDot value={peak.value} className="mx-1 align-middle" />
               <strong className="font-semibold">{peak.value}</strong> on {shortDate(peak.date)}
             </span>
+          ) : start > today ? (
+            <span className="text-muted-foreground">
+              Still ahead — no check-ins for these days yet.
+            </span>
           ) : (
-            <span className="text-muted-foreground">No stress data yet — this is still ahead.</span>
+            <span className="text-muted-foreground">Nearby stress peak: Not enough responses</span>
           )}
         </div>
       )}
