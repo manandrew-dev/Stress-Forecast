@@ -9,6 +9,7 @@
 - **Auth:** every endpoint requires `Authorization: Bearer <Auth0 access token>`.
 - **Format:** JSON in and out, except `POST /syllabus`, which also accepts `multipart/form-data`.
 - **Dates:** `YYYY-MM-DD`. **Timestamps:** ISO 8601 with offset, e.g. `2026-11-07T21:04:00-08:00`.
+- **Local days:** "today", same-day check-in replacement, trend points and cohort days all use `America/Vancouver` (`LOCAL_TIMEZONE` in `backend/app/config.py`).
 - **Roles:** each endpoint lists the role it requires. Wrong role → `403`.
 
 ### Errors
@@ -23,7 +24,7 @@ All errors use one shape:
 | --- | --- | --- |
 | 400 | `bad_request` | Invalid body or params |
 | 401 | `unauthorized` | Missing or invalid token |
-| 403 | `forbidden` | Wrong role, or rep not assigned to this course |
+| 403 | `forbidden` | Wrong role, rep not assigned to this course, student not enrolled in this course, or student changing a deadline they didn't save |
 | 404 | `not_found` | Resource doesn't exist |
 | 422 | `ai_parse_failed` | Gemini returned unusable output after one retry |
 | 500 | `internal` | Anything else |
@@ -37,6 +38,13 @@ type DeadlineType = "exam" | "midterm" | "quiz" | "assignment" | "project" | "ot
 interface Course   { id: number; code: string; name: string; term: string }
 interface Deadline { id: number; course_id: number; title: string; due_date: string; weight_pct: number | null; type: DeadlineType }
 ```
+
+### Which deadlines are returned
+
+Seeded (official) deadlines have no creator, and `POST /deadlines` saves a copy per student, so the same assessment can be stored many times. Every endpoint that returns deadlines de-duplicates them by course, case-insensitive trimmed title, and due date:
+
+- **Course level** (`/me/heads-up`, `/courses/{id}/cohort`, `/collisions`, `/report`): every stored copy counts; the official row is preferred.
+- **A student's own view** (`/me/trend`): official deadlines for the student's courses plus the student's own copies; the student's copy is preferred.
 
 ---
 
@@ -69,10 +77,12 @@ Request:
 ```json
 { "course_ids": [1, 2, 3] }
 ```
-Response: `204 No Content`
+Response: `204 No Content`. An unknown course id → `400` (nothing is changed). Duplicates are ignored; `[]` removes every enrollment.
 
 ### `POST /syllabus`
-**Role:** student. Extracts deadlines with Gemini. **Does not save them** — the student reviews first.
+**Role:** student, enrolled in `course_id` (`403` otherwise; unknown course → `404`). Extracts deadlines with Gemini. **Does not save them** — the student reviews first.
+
+PDF text is extracted on the server; only the text goes to Gemini. A PDF with no extractable text (e.g. a scan), an encrypted PDF, or a file over 10 MB → `400`, so the student can paste the text instead. Text over 100,000 characters → `400`.
 
 Request (either form):
 ```
@@ -94,7 +104,7 @@ Response:
 ```
 
 ### `POST /deadlines`
-**Role:** student. Saves reviewed deadlines for a course. Replaces any deadlines this student previously saved for that course.
+**Role:** student, enrolled in `course_id`. Saves reviewed deadlines for a course. Replaces any deadlines this student previously saved for that course (official deadlines are never touched). Each title must be non-empty and `weight_pct` must be `null` or 0–100, else `400`.
 
 Request:
 ```json
@@ -106,10 +116,10 @@ Response:
 ```
 
 ### `PUT /deadlines/{id}` · `DELETE /deadlines/{id}`
-**Role:** student (creator only). `PUT` body is a `Deadline` without `id`/`course_id`; returns the updated `Deadline`. `DELETE` returns `204`.
+**Role:** student (creator only). `PUT` body is a `Deadline` without `id`/`course_id`; returns the updated `Deadline`. `DELETE` returns `204`. Official deadlines and other students' copies → `403`; unknown id → `404`.
 
 ### `POST /checkins`
-**Role:** student. Parses with Gemini and saves. A second check-in on the same local day **replaces** the first.
+**Role:** student. Parses with Gemini and saves. A second check-in on the same local day **replaces** the first. `text` must be 1–2,000 characters after trimming, else `400`. Only the text is sent to Gemini.
 
 Request:
 ```json
@@ -131,7 +141,7 @@ Response:
 If `concerning` is `true`, the frontend must show the support-resources message (see `requirements.md` §5).
 
 ### `GET /me/trend?from=YYYY-MM-DD&to=YYYY-MM-DD`
-**Role:** student. Own data only. Defaults to the current term.
+**Role:** student. Own data only. Both parameters are optional: without `from`, points start at the student's first check-in; without `to`, they end today. Deadlines are filtered only by the bounds that are given (no range → all of them, including upcoming ones). `from` after `to` → `400`.
 
 ```json
 {
@@ -166,7 +176,9 @@ All rep endpoints: role `rep` **and** the rep must be assigned to `{course_id}`,
 **No rep endpoint ever returns a user id, raw text, or a single student's data.**
 
 ### `GET /courses/{course_id}/cohort?from=YYYY-MM-DD&to=YYYY-MM-DD`
-Daily cohort stress with deadlines. Days with fewer than 5 students are **suppressed**: `avg_stress` and `n_students` are `null` (the real values are never sent).
+Daily cohort stress with deadlines. Days with fewer than 5 students are **suppressed**: `avg_stress` and `n_students` are `null` (the real values are never sent). There is one entry per day in the range; a day with no check-ins at all is also suppressed.
+
+Both parameters are optional: without `from`, days start at the first day with enough responses; without `to`, they end today. Deadlines are filtered only by the bounds that are given. `from` after `to`, or a range of 366 days or more → `400`.
 
 ```json
 {
@@ -200,7 +212,9 @@ Collision windows for the whole term, with the nearby stress peak (non-suppresse
 ```
 
 ### `GET /courses/{course_id}/report?week_start=YYYY-MM-DD`
-Weekly Gemini report built **only** from non-suppressed aggregates, deadlines, and collisions. Defaults to the current week.
+Weekly Gemini report built **only** from non-suppressed aggregates, deadlines, and collisions. Defaults to the current week. Any `week_start` is moved back to that week's Monday, and the response's `week_start` is that Monday.
+
+Reports are cached on the server for 30 minutes per course and week (`REPORT_CACHE_SECONDS`), so repeated page loads don't call Gemini again. If the week has no day with enough responses, Gemini isn't called and the response says so (`top_cause: "not enough data"`).
 
 ```json
 {
