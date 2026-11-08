@@ -167,3 +167,6 @@ __pycache__/
 *-credentials.txt
 *.dump
 *.pgdump
+
+# macOS Finder files
+.DS_Store

@@ -258,7 +258,8 @@ export async function getMyTrend(
 export async function getHeadsUp(user: AuthUser | null): Promise<HeadsUpResponse> {
   await latency();
   requireUser(user, "student");
-  return { collisions: headsUp(enrolledDeadlines(), MOCK_TODAY) };
+  const codes = new Map(COURSES.map((c) => [c.id, c.code]));
+  return { collisions: headsUp(enrolledDeadlines(), MOCK_TODAY, codes) };
 }
 
 // ---------- rep ----------

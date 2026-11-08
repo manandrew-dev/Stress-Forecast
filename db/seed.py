@@ -17,6 +17,7 @@ from backend.app import config
 from backend.app.models import DeadlineType
 
 TERM = "2026W1"
+DEMO_LOCK_KEY = f"stress-forecast-demo:{TERM}"
 TERM_START = dt.date(2026, 9, 8)
 DEMO_DAY = dt.date(2026, 11, 7)
 LOW_RESPONSE_DAY = dt.date(2026, 9, 13)
@@ -264,7 +265,7 @@ async def seed_demo(
     async with connection.transaction():
         # The schema has no uniqueness constraint on course code and term.
         await connection.execute(
-            "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", f"stress-forecast-demo:{TERM}",
+            "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", DEMO_LOCK_KEY,
         )
         existing = await connection.fetch(
             "SELECT id, code, name FROM courses WHERE term = $1 AND code = ANY($2::text[])",
@@ -317,34 +318,56 @@ async def seed_demo(
             )
             for code, name in COURSES.items()
         }
-        await connection.executemany(
-            "INSERT INTO enrollments (user_id, course_id) VALUES ($1, $2)",
-            ((user_id, course_ids[code]) for user_id, courses in enrollments.items() for code in courses),
-        )
-        await connection.executemany(
-            "INSERT INTO rep_assignments (user_id, course_id) VALUES ($1, $2)",
-            ((rep_sub, course_ids[code]) for code in REP_COURSES),
-        )
-        await connection.executemany(
-            "INSERT INTO deadlines (course_id, title, due_date, weight_pct, type) VALUES ($1, $2, $3, $4, $5)",
-            (
-                (course_ids[item.course], item.title, item.due_date, item.weight, item.kind)
-                for item in ASSESSMENTS
-            ),
-        )
         checkins = generate_checkins(enrollments)
+        await write_demo_rows(connection, rep_sub, enrollments, course_ids, checkins)
+    return len(checkins)
+
+
+async def write_demo_rows(
+    connection: asyncpg.Connection,
+    rep_sub: str,
+    enrollments: dict[str, tuple[str, ...]],
+    course_ids: dict[str, int],
+    checkins: Sequence[Checkin],
+    *,
+    existing_deadlines: dict[tuple[int, str], int] | None = None,
+) -> None:
+    """Populate the fixture for existing users and courses in the caller's transaction."""
+    await connection.executemany(
+        "INSERT INTO enrollments (user_id, course_id) VALUES ($1, $2)",
+        ((user_id, course_ids[code]) for user_id, courses in enrollments.items() for code in courses),
+    )
+    await connection.executemany(
+        "INSERT INTO rep_assignments (user_id, course_id) VALUES ($1, $2)",
+        ((rep_sub, course_ids[code]) for code in REP_COURSES),
+    )
+    known = existing_deadlines or {}
+    if known:
         await connection.executemany(
-            "INSERT INTO checkins (time, user_id, stress, sleep_hours, causes, raw_text) VALUES ($1, $2, $3, $4, $5, $6)",
-            checkins,
-        )
-        await connection.executemany(
-            "INSERT INTO checkin_course (time, course_id, user_id, stress) VALUES ($1, $2, $3, $4)",
+            "UPDATE deadlines SET due_date = $2, weight_pct = $3, type = $4 WHERE id = $1",
             (
-                (row.time, course_ids[code], row.user_id, row.stress)
-                for row in checkins for code in enrollments[row.user_id]
+                (known[key], item.due_date, item.weight, item.kind)
+                for item in ASSESSMENTS if (key := (course_ids[item.course], item.title)) in known
             ),
         )
-    return len(checkins)
+    await connection.executemany(
+        "INSERT INTO deadlines (course_id, title, due_date, weight_pct, type) VALUES ($1, $2, $3, $4, $5)",
+        (
+            (course_ids[item.course], item.title, item.due_date, item.weight, item.kind)
+            for item in ASSESSMENTS if (course_ids[item.course], item.title) not in known
+        ),
+    )
+    await connection.executemany(
+        "INSERT INTO checkins (time, user_id, stress, sleep_hours, causes, raw_text) VALUES ($1, $2, $3, $4, $5, $6)",
+        checkins,
+    )
+    await connection.executemany(
+        "INSERT INTO checkin_course (time, course_id, user_id, stress) VALUES ($1, $2, $3, $4)",
+        (
+            (row.time, course_ids[code], row.user_id, row.stress)
+            for row in checkins for code in enrollments[row.user_id]
+        ),
+    )
 
 
 async def refresh_demo_history(connection: asyncpg.Connection) -> None:

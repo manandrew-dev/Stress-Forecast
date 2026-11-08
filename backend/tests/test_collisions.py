@@ -215,3 +215,67 @@ def test_cross_course_peak_matches_rep_collisions():
 
 def test_cross_course_uses_cohort_min_from_config():
     assert COHORT_MIN == 5  # the router passes config.COHORT_MIN; never a literal
+
+
+# --- heads-up nudge: only upcoming deadlines, named with the course code ---
+
+DEMO_WEEK9 = [
+    d("2026-11-03", 20, "Midterm 2", course_id=1),
+    d("2026-11-05", 25, "Midterm 2", course_id=2),
+    d("2026-11-07", 10, "Quiz 4", course_id=1),
+]
+CODES = {1: "CPSC 210", 2: "MATH 200"}
+
+
+def test_nudge_skips_deadlines_already_past():
+    [c] = find_collisions(DEMO_WEEK9)
+    assert heads_up_message(c, dt.date(2026, 11, 7), CODES) == "3 assessments worth 55% in 5 days. Start CPSC 210 Quiz 4 early."
+
+
+def test_nudge_includes_deadlines_due_today():
+    [c] = find_collisions(DEMO_WEEK9)
+    assert heads_up_message(c, dt.date(2026, 11, 5), CODES).endswith("Start MATH 200 Midterm 2 early.")
+
+
+def test_nudge_left_out_when_everything_is_past():
+    [c] = find_collisions(DEMO_WEEK9)
+    assert heads_up_message(c, dt.date(2026, 11, 8), CODES) == "3 assessments worth 55% in 5 days."
+
+
+def test_nudge_without_codes_falls_back_to_title():
+    [c] = find_collisions(DEMO_WEEK9)
+    assert heads_up_message(c, dt.date(2026, 11, 7)).endswith("Start Quiz 4 early.")
+
+
+def test_heads_up_passes_today_and_codes():
+    [c] = heads_up(DEMO_WEEK9, dt.date(2026, 11, 7), CODES)
+    assert c.message.endswith("Start CPSC 210 Quiz 4 early.")
+
+
+# --- weight rule needs a pile-up (>= COLLISION_WEIGHT_MIN_COUNT assessments) ---
+
+
+def test_single_heavy_final_is_not_a_collision():
+    assert find_collisions([d("2026-12-14", 50, "Final Exam")]) == []
+    assert find_collisions([d("2026-12-14", 100, "Final Exam")]) == []
+
+
+def test_two_assessments_reaching_the_weight_threshold_still_collide():
+    [c] = find_collisions([d("2026-12-10", 20), d("2026-12-12", 20)])
+    assert (c.deadline_count, c.total_weight_pct) == (2, 40)
+
+
+def test_lone_heavy_final_no_longer_stretches_a_window():
+    # Finals week in the seed: CPSC 20% (Dec 10), PHYS 35% (Dec 12), MATH 40% (Dec 14).
+    finals = [d("2026-12-10", 20, course_id=1), d("2026-12-12", 35, course_id=3), d("2026-12-14", 40, course_id=2)]
+    [c] = find_collisions(finals)
+    assert (c.start, c.end) == (dt.date(2026, 12, 10), dt.date(2026, 12, 16))  # was Dec 18
+
+
+def test_lone_heavy_assessment_gives_no_heads_up():
+    assert heads_up([d("2026-11-10", 45, "Research Essay")], dt.date(2026, 11, 7)) == []
+
+
+def test_lone_heavy_assessment_is_not_a_rep_pile_up():
+    students = [[1]] * 20
+    assert cross_course_rep_collisions(1, [d("2026-12-04", 40, "Research Essay", course_id=1)], students, [], 5) == []
