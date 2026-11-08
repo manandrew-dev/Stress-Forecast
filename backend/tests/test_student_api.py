@@ -318,3 +318,15 @@ def test_heads_up(as_user, db, monkeypatch):
     [c] = as_user(STUDENT).get("/api/me/heads-up").json()["collisions"]
     assert (c["start"], c["deadline_count"], c["total_weight_pct"]) == ("2026-11-03", 3, 55.0)
     assert c["message"] == "3 assessments worth 55% in 5 days. Start Project Phase 3 early."
+
+
+def test_malformed_multipart_is_400(as_user, db):
+    r = as_user(STUDENT).post("/api/syllabus", content=b"garbage",
+                              headers={"content-type": "multipart/form-data; boundary=x"})
+    check_error(r, 400, "bad_request")
+
+
+def test_update_deadline_deleted_mid_request(as_user, db):
+    db.on("SELECT created_by FROM deadlines", {"created_by": STUDENT.id})  # owned, but UPDATE matched nothing
+    body = {"title": "X", "due_date": "2026-10-14", "weight_pct": 5, "type": "quiz"}
+    check_error(as_user(STUDENT).put("/api/deadlines/7", json=body), 404, "not_found")

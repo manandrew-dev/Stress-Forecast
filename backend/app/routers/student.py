@@ -6,6 +6,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response
 from pydantic import ValidationError
 from starlette.datastructures import UploadFile
+from starlette.formparsers import MultiPartException
 
 from .. import localtime
 from ..auth import AuthenticatedUser, require_role
@@ -87,7 +88,10 @@ async def set_courses(body: EnrollmentsRequest, user: Student, db: Pool) -> Resp
 async def _syllabus_input(request: Request) -> tuple[int, str]:
     """Accepts JSON {course_id, text} or multipart course_id + file (PDF)."""
     if request.headers.get("content-type", "").startswith("multipart/form-data"):
-        form = await request.form(max_files=1, max_fields=4)
+        try:
+            form = await request.form(max_files=1, max_fields=4)
+        except MultiPartException:
+            raise HTTPException(400, "Could not read the upload") from None
         try:
             course_id = int(str(form.get("course_id", "")))
         except ValueError:
@@ -169,6 +173,7 @@ async def update_deadline(
     )
     if row is None:
         await _own_deadline_or_raise(db, deadline_id, user.id)
+        raise HTTPException(404, "Deadline not found")  # deleted between the two queries
     return Deadline(**dict(row))
 
 
