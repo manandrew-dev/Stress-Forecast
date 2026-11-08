@@ -8,6 +8,12 @@ export function formatDay(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** Today's date in the user's own timezone (not UTC), as "YYYY-MM-DD". */
+export function todayLocal(now: Date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
 export function addDays(day: string, n: number): string {
   const d = parseDay(day);
   d.setUTCDate(d.getUTCDate() + n);

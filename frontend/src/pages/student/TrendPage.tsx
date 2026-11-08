@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useCourseMap } from "@/components/useCourseMap";
 import { deadlineMarks, fillTimeline, trendToPoints } from "@/lib/chart-series";
-import { addDays, diffDays } from "@/lib/dates";
+import { addDays, diffDays, todayLocal } from "@/lib/dates";
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
@@ -37,7 +37,10 @@ export function TrendPage() {
     const sortedDue = deadlines.map((d) => d.due_date).sort();
     const firstDue = sortedDue[0] ?? first.date;
     const origin = firstDue < first.date ? firstDue : first.date;
-    const today = lastPoint.date;
+    // Anchor "today" and the 7-day stats to the real date, not the last check-in,
+    // so a student who skipped a few days isn't shown stale numbers.
+    const now = todayLocal();
+    const today = lastPoint.date > now ? lastPoint.date : now;
     const lastDue = sortedDue.at(-1) ?? today;
     const end = lastDue > today ? lastDue : today;
     const last7 = points.filter((p) => p.date > addDays(today, -7));
@@ -51,7 +54,7 @@ export function TrendPage() {
       sleep7: sleeps.length ? sleeps.reduce((a, b) => a + b, 0) / sleeps.length : null,
       checkins: points.length,
       upcoming: deadlines
-        .filter((d) => d.due_date > today)
+        .filter((d) => d.due_date >= today)
         .sort((a, b) => a.due_date.localeCompare(b.due_date))
         .slice(0, 4),
     };
