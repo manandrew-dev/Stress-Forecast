@@ -91,7 +91,16 @@ export function DeadlinesPage() {
     const week = upcoming.filter((d) => diffDays(d.due_date, today) < 7);
     const later = upcoming.filter((d) => diffDays(d.due_date, today) >= 7);
     const past = shown.filter((d) => d.due_date < today).reverse();
-    const weightAhead = upcoming.reduce((s, d) => s + (d.weight_pct ?? 0), 0);
+    // Weight is a share of each course's own grade, so it only adds up within one course.
+    const aheadByCourse = new Map<number, number>();
+    for (const d of upcoming) {
+      if (d.weight_pct !== null)
+        aheadByCourse.set(d.course_id, (aheadByCourse.get(d.course_id) ?? 0) + d.weight_pct);
+    }
+    const weightAhead = [...aheadByCourse.entries()].map(([courseId, weight]) => ({
+      courseId,
+      weight,
+    }));
     return { all, courseIds, upcoming, week, later, past, weightAhead };
   }, [q.data, course, today]);
 
@@ -149,12 +158,27 @@ export function DeadlinesPage() {
           <p className="text-sm text-muted-foreground">
             <strong className="font-semibold text-foreground">{view.upcoming.length}</strong>{" "}
             upcoming
-            {view.weightAhead > 0 && (
+            {course !== null && view.weightAhead.length === 1 ? (
               <>
                 {" · "}
-                <strong className="font-semibold text-foreground">{view.weightAhead}%</strong> of
-                your grades still ahead
+                <strong className="font-semibold text-foreground">
+                  {view.weightAhead[0]!.weight}%
+                </strong>{" "}
+                of {courses.get(course)?.code ?? "this course"}&rsquo;s grade still ahead
               </>
+            ) : (
+              view.weightAhead.length > 0 && (
+                <>
+                  {" · still ahead: "}
+                  {view.weightAhead.map(({ courseId, weight }, i) => (
+                    <span key={courseId}>
+                      {i > 0 && " · "}
+                      {courses.get(courseId)?.code ?? "Course"}{" "}
+                      <strong className="font-semibold text-foreground">{weight}%</strong>
+                    </span>
+                  ))}
+                </>
+              )
             )}
           </p>
 
