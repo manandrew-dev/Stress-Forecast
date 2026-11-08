@@ -26,7 +26,7 @@ from ..models import (
     TrendPoint,
     TrendResponse,
 )
-from ..services import collisions, gemini
+from ..services import cohort, collisions, gemini
 from ..services.deadlines import course_deadlines, enrolled_course_ids, student_deadlines
 from ..services.syllabus import SyllabusTextError, pdf_text
 
@@ -281,5 +281,7 @@ async def get_trend(
 
 @router.get("/me/heads-up", response_model=HeadsUpResponse)
 async def get_heads_up(user: Student, db: Pool) -> HeadsUpResponse:
-    deadlines = await course_deadlines(db, await enrolled_course_ids(db, user.id))
-    return HeadsUpResponse(collisions=collisions.heads_up(deadlines, localtime.today()))
+    course_ids = await enrolled_course_ids(db, user.id)
+    deadlines = await course_deadlines(db, course_ids)
+    codes = await cohort.course_codes(db, course_ids)
+    return HeadsUpResponse(collisions=collisions.heads_up(deadlines, localtime.today(), codes))
