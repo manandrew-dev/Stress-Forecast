@@ -18,6 +18,7 @@ from ..models import (
     CohortResponse,
     CollisionsResponse,
     Course,
+    Deadline,
     Insight,
     InsightsResponse,
     ReportResponse,
@@ -42,6 +43,14 @@ async def _course_or_404(db, course_id: int) -> Course:
     return course
 
 
+async def _shared_view(db, course_id: int) -> tuple[list[list[int]], list[Deadline]]:
+    """The class's anonymous course sets, and deadlines for this course plus its shared
+    courses (other courses at least COHORT_MIN of the class also take)."""
+    students = await cohort.cohort_course_sets(db, course_id)
+    shared = collisions.shared_course_ids(course_id, students, COHORT_MIN)
+    return students, await course_deadlines(db, [course_id, *shared])
+
+
 @router.get("/courses/{course_id}/cohort", response_model=CohortResponse)
 async def get_cohort(
     course_id: CourseId,
@@ -49,7 +58,8 @@ async def get_cohort(
     from_date: Annotated[dt.date | None, Query(alias="from")] = None,
     to_date: Annotated[dt.date | None, Query(alias="to")] = None,
 ) -> CohortResponse:
-    """Daily cohort stress. Without a range: first visible day to today, all deadlines."""
+    """Daily cohort stress with this course's and its shared courses' deadlines.
+    Without a range: first visible day to today, all deadlines."""
     course = await _course_or_404(db, course_id)
     end = to_date or localtime.today()
     if from_date and from_date > end:
@@ -58,8 +68,9 @@ async def get_cohort(
         raise HTTPException(400, "Date range is too long")
 
     days = await cohort.cohort_days(db, course_id, from_date, end)
+    _students, shared_deadlines = await _shared_view(db, course_id)
     deadlines = [
-        d for d in await course_deadlines(db, [course_id])
+        d for d in shared_deadlines
         if (from_date is None or d.due_date >= from_date) and (to_date is None or d.due_date <= to_date)
     ]
     return CohortResponse(course=course, min_students=COHORT_MIN, days=days, deadlines=deadlines)
@@ -67,10 +78,14 @@ async def get_cohort(
 
 @router.get("/courses/{course_id}/collisions", response_model=CollisionsResponse)
 async def get_collisions(course_id: CourseId, db: Pool) -> CollisionsResponse:
+    """Pile-ups across the courses this class shares, with how many students each affects."""
     await _course_or_404(db, course_id)
-    deadlines = await course_deadlines(db, [course_id])
+    students, deadlines = await _shared_view(db, course_id)
     stress = await cohort.daily_stress(db, course_id)
-    return CollisionsResponse(collisions=collisions.rep_collisions(deadlines, stress))
+    return CollisionsResponse(
+        cohort_size=len(students),
+        collisions=collisions.cross_course_rep_collisions(course_id, deadlines, students, stress, COHORT_MIN),
+    )
 
 
 @router.get("/courses/{course_id}/report", response_model=ReportResponse)
@@ -101,9 +116,15 @@ async def get_report(
             suggested_fix="Encourage more students to check in so the cohort view has enough responses.",
         )
     else:
-        deadlines = await course_deadlines(db, [course_id])
-        flagged = collisions.rep_collisions(deadlines, await cohort.daily_stress(db, course_id))
-        result = await gemini.weekly_report(course, aggregates, deadlines, flagged, week_start=week)
+        students, deadlines = await _shared_view(db, course_id)
+        flagged = collisions.cross_course_rep_collisions(
+            course_id, deadlines, students, await cohort.daily_stress(db, course_id), COHORT_MIN
+        )
+        # Only aggregates, deadlines and collisions go to Gemini; the course sets stay here.
+        codes = await cohort.course_codes(db, {d.course_id for d in deadlines})
+        result = await gemini.weekly_report(
+            course, aggregates, deadlines, flagged, week_start=week, course_codes=codes
+        )
         report = ReportResponse(week_start=week, **result.model_dump())
 
     _report_cache[key] = (time.monotonic() + REPORT_CACHE_SECONDS, report)

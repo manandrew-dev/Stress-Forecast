@@ -147,11 +147,13 @@ class CohortResponse(DeadlinesResponse):
 
 
 class RepCollision(CollisionWindow):
+    students_affected: int
     peak_avg_stress: float | None
     peak_date: dt.date | None
 
 
 class CollisionsResponse(BaseModel):
+    cohort_size: int
     collisions: list[RepCollision]
 
 
