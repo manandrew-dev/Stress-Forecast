@@ -48,5 +48,9 @@ async def handle_invalid_request(_request: Request, _exc: RequestValidationError
     return error_response(400, "Invalid request body or parameters")
 
 
+async def handle_ai_parse_error(_request: Request, _exc: Exception) -> JSONResponse:
+    return error_response(422, "The AI couldn't read that. Please try again or rephrase it.")
+
+
 async def handle_internal_error(_request: Request, _exc: Exception) -> JSONResponse:
     return error_response(500)

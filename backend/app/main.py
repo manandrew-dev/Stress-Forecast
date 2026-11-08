@@ -7,8 +7,15 @@ from starlette.responses import Response
 
 from .config import CORS_ORIGINS
 from .db import database_lifespan
-from .errors import error_response, handle_http_error, handle_internal_error, handle_invalid_request
+from .errors import (
+    error_response,
+    handle_ai_parse_error,
+    handle_http_error,
+    handle_internal_error,
+    handle_invalid_request,
+)
 from .routers import courses, rep, student
+from .services.gemini import AIParseError
 
 
 class APICORSMiddleware(CORSMiddleware):
@@ -29,6 +36,7 @@ api = FastAPI(
     exception_handlers={
         HTTPException: handle_http_error,
         RequestValidationError: handle_invalid_request,
+        AIParseError: handle_ai_parse_error,
         Exception: handle_internal_error,
     },
 )

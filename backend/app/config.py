@@ -23,3 +23,14 @@ COLLISION_MIN_WEIGHT = 40
 COLLISION_WINDOW_DAYS = 5
 COLLISION_PEAK_LOOKBACK_DAYS = 3
 HEADS_UP_DAYS = 14
+
+# Local day boundaries for check-in replacement, trends and cohort dates.
+LOCAL_TIMEZONE = "America/Vancouver"
+
+# Input limits for student uploads.
+MAX_CHECKIN_CHARS = 2000
+MAX_SYLLABUS_CHARS = 100_000
+MAX_SYLLABUS_BYTES = 10 * 1024 * 1024
+
+# Weekly Gemini reports are cached in memory per (course_id, week_start).
+REPORT_CACHE_SECONDS = 30 * 60
