@@ -4,6 +4,8 @@
 
 Built at HackCamp 2026. Students do a 30-second daily check-in and upload their syllabi. We line up anonymized, class-wide stress against every deadline in their courses, flag the weeks where deadlines pile up, and give class reps the evidence to ask for a date to move.
 
+**Live app:** https://stress-forecast.vercel.app (log in with a demo student or rep account; the first load can take up to a minute while the free backend wakes up)
+
 **Figma:** https://www.figma.com/design/RnZfnSDgXSIwCTBCtCm2DH/Stress-Forecast?node-id=2-4&t=tqvBF1zWmvZsywUi-1
 
 ## Inspiration
@@ -53,9 +55,10 @@ Stress is shared and predictable. When three midterms and a project land in the 
 | Database | **Tiger Data** (Postgres + TimescaleDB: check-ins hypertable, daily stress continuous aggregate) | Keith |
 | AI | **Gemini API** (syllabus extraction, check-in parsing, weekly reports) | Khan |
 | Analytics | **Databricks** notebook: which deadline patterns come before stress spikes | Khan |
-| Dev tools | **Freebuff** (coding agent), **Entire** (session history), Claude Code, Gemini CLI | Everyone |
+| Hosting | Vercel (frontend), Render (backend) | Lawrence |
+| Dev tools | **Freebuff** (main coding agent), **Entire** (Sessions, Graph, Brain), Claude Code, Codex | Everyone |
 
-Freebuff screenshots for the write-up are in [`docs/freebuff/`](docs/freebuff/).
+Screenshots of how we used each tool are in [`docs/freebuff/`](docs/freebuff/), [`docs/entire/`](docs/entire/), [`docs/lovable/`](docs/lovable/) and [`docs/databricks/`](docs/databricks/).
 
 ## Repo layout
 
@@ -97,6 +100,20 @@ Click **Log in** for the student side or **Try it as a class rep** for the rep s
 
 Never commit `.env` files. The Gemini free quota is small, so practise with sample data and save real calls for the demo.
 
+**Tips:**
+- To skip running the backend, point `VITE_API_URL` at the live one: `https://stress-forecast.onrender.com/api`.
+- No trailing slash on `AUTH0_AUDIENCE` or `CORS_ORIGINS`, or login fails.
+- On a Mac with Python from python.org, if login returns "Internal Server Error" and the backend log says "Auth0 signing keys are unavailable", add `SSL_CERT_FILE=<path>` to `backend/.env`, where `<path>` is the output of `.venv/bin/python -c "import certifi; print(certifi.where())"`.
+- If Gemini returns 503 "high demand", wait a minute and try again.
+
+## Deployment
+
+The live app runs on free tiers, so nothing here costs money.
+
+- **Backend on Render:** a Web Service from this repo with root directory `backend`, build command `pip install -r requirements.txt` and start command `uvicorn app.main:app --host 0.0.0.0 --port $PORT`. Set the `backend/.env` variables in Render's environment settings (plus `PYTHON_VERSION=3.13`), and list every frontend origin in `CORS_ORIGINS`, comma-separated. The free tier sleeps after about 15 minutes idle.
+- **Frontend on Vercel:** root directory `frontend`, framework preset **Other**, build command `npm run build`, and environment variables `NITRO_PRESET=vercel`, `VITE_API_URL=<Render URL>/api`, `VITE_USE_MOCKS=false` and the three `VITE_AUTH0_*` values. `VITE_*` values are baked in at build time, so redeploy after changing them.
+- **Auth0:** add the Vercel URL to the application's Allowed Callback URLs, Allowed Logout URLs and Allowed Web Origins, next to `http://localhost:5173`.
+
 ## Tests
 
 ```bash
@@ -123,9 +140,9 @@ All cohort data is **seeded for the demo**: 40 fictional students across four `D
 ## Team
 
 - **Andrew:** student frontend, Lovable scaffold, demo video, Devpost
-- **Lawrence:** rep frontend, pitch slides and demo script, Community Impact statement
+- **Lawrence:** rep frontend, deployment, pitch slides and demo script, Community Impact statement
 - **Keith:** backend data and auth, Tiger Data, Auth0, seed
-- **Khan:** Gemini, collision detection, Databricks
+- **Khan:** Gemini, collision detection, Databricks, student and rep API endpoints
 
 ## License
 
