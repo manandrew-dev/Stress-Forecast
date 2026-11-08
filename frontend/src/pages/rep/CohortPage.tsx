@@ -112,7 +112,7 @@ function CohortForCourse({ courseId }: { courseId: number }) {
       <PageHeader
         eyebrow={q.data ? `${q.data.course.code} · ${q.data.course.term}` : "Cohort"}
         title="How the class is feeling"
-        description={`Daily average stress across the term, with every ${q.data ? `${q.data.course.code} ` : ""}deadline on the same timeline.`}
+        description="Daily average stress across the term, with every deadline this class has — including other courses they take."
       />
       {q.isPending ? (
         <LoadingBlock rows={2} />
