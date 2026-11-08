@@ -176,7 +176,7 @@ All rep endpoints: role `rep` **and** the rep must be assigned to `{course_id}`,
 **No rep endpoint ever returns a user id, raw text, or a single student's data.**
 
 ### `GET /courses/{course_id}/cohort?from=YYYY-MM-DD&to=YYYY-MM-DD`
-Daily cohort stress with deadlines. Days with fewer than 5 students are **suppressed**: `avg_stress` and `n_students` are `null` (the real values are never sent). There is one entry per day in the range; a day with no check-ins at all is also suppressed.
+Daily cohort stress with deadlines. `deadlines` holds this course's deadlines plus those of its **shared courses** (see Collisions below), so the chart shows everything the class is juggling. Days with fewer than 5 students are **suppressed**: `avg_stress` and `n_students` are `null` (the real values are never sent). There is one entry per day in the range; a day with no check-ins at all is also suppressed.
 
 Both parameters are optional: without `from`, days start at the first day with enough responses; without `to`, they end today. Deadlines are filtered only by the bounds that are given. `from` after `to`, or a range of 366 days or more → `400`.
 
@@ -193,26 +193,42 @@ Both parameters are optional: without `from`, days start at the first day with e
 ```
 
 ### `GET /courses/{course_id}/collisions`
-Collision windows for the whole term, with the nearby stress peak (non-suppressed days only; `null` if none).
+Collision windows for the whole term, **across the courses this class shares** (changed Nov 7; see `docs/requirements.md` §4).
+
+How a rep collision is found:
+
+1. **Shared courses:** any other course that at least `COHORT_MIN` (5) students of this course are also enrolled in.
+2. Run the collision rule (`docs/architecture.md` §7) over this course's deadlines plus the shared courses' deadlines.
+3. Keep only windows that contain **at least one deadline of this course**, since that's what the rep can act on.
+4. `students_affected`: how many of this course's students would see this window as a collision counting only **their own** courses. Windows with fewer than `COHORT_MIN` affected students are dropped, so no small group can be singled out.
+5. Nearby stress peak: this course's daily average, non-suppressed days only, from 3 days before the window to its end (`null` if none).
+
+`deadlines` includes the shared courses' deadlines; `course_id` tells them apart. `cohort_size` is the number of students enrolled in this course.
 
 ```json
 {
+  "cohort_size": 42,
   "collisions": [
     {
-      "start": "2026-11-09",
-      "end": "2026-11-13",
+      "start": "2026-11-03",
+      "end": "2026-11-06",
       "deadline_count": 3,
       "total_weight_pct": 55,
-      "deadlines": [ { "id": 12, "course_id": 1, "title": "Midterm 2", "due_date": "2026-11-10", "weight_pct": 25, "type": "midterm" } ],
-      "peak_avg_stress": 8.1,
-      "peak_date": "2026-11-08"
+      "deadlines": [
+        { "id": 12, "course_id": 1, "title": "Midterm 2", "due_date": "2026-11-03", "weight_pct": 25, "type": "midterm" },
+        { "id": 31, "course_id": 3, "title": "Circuits project", "due_date": "2026-11-04", "weight_pct": 10, "type": "project" },
+        { "id": 22, "course_id": 2, "title": "Midterm 2", "due_date": "2026-11-06", "weight_pct": 20, "type": "midterm" }
+      ],
+      "students_affected": 28,
+      "peak_avg_stress": 8.8,
+      "peak_date": "2026-11-03"
     }
   ]
 }
 ```
 
 ### `GET /courses/{course_id}/report?week_start=YYYY-MM-DD`
-Weekly Gemini report built **only** from non-suppressed aggregates, deadlines, and collisions. Defaults to the current week. Any `week_start` is moved back to that week's Monday, and the response's `week_start` is that Monday.
+Weekly Gemini report built **only** from non-suppressed aggregates, deadlines, and collisions (including cross-course collisions). The suggested fix moves one of **this course's own** deadlines, since that's the date the rep can ask about. Defaults to the current week. Any `week_start` is moved back to that week's Monday, and the response's `week_start` is that Monday.
 
 Reports are cached on the server for 30 minutes per course and week (`REPORT_CACHE_SECONDS`), so repeated page loads don't call Gemini again. If the week has no day with enough responses, Gemini isn't called and the response says so (`top_cause: "not enough data"`).
 

@@ -204,6 +204,25 @@ describe("mock data mirrors db/seed.py", () => {
     expect(week9!.peak_avg_stress).not.toBeNull();
   });
 
+  it("shows the rep pile-ups across the courses the class shares", async () => {
+    const { cohort_size, collisions } = await run(mock.getCollisions(rep, 1));
+    expect(cohort_size).toBe(25);
+    const finals = collisions.find((c) => c.start === "2026-12-10");
+    expect(finals).toMatchObject({
+      deadline_count: 3,
+      total_weight_pct: 95,
+      students_affected: 20,
+    });
+    expect(new Set(finals!.deadlines.map((d) => d.course_id))).toEqual(new Set([1, 2, 3]));
+    // Every rep pile-up includes one of the course's own deadlines.
+    expect(collisions.every((c) => c.deadlines.some((d) => d.course_id === 1))).toBe(true);
+  });
+
+  it("puts shared courses' deadlines on the cohort chart", async () => {
+    const { deadlines } = await run(mock.getCohort(rep, 1));
+    expect(new Set(deadlines.map((d) => d.course_id))).toEqual(new Set([1, 2, 3, 4]));
+  });
+
   it("only hides the seed's low-response day", async () => {
     const { days } = await run(mock.getCohort(rep, 1));
     expect(days.filter((d) => d.suppressed).map((d) => d.date)).toEqual(["2026-09-13"]);

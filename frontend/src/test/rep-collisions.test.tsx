@@ -14,6 +14,7 @@ const CPSC: Course = { id: 1, code: "CPSC 210", name: "Software Construction", t
 const MATH: Course = { id: 2, code: "MATH 200", name: "Calculus III", term: "2026W1" };
 
 const collisions: CollisionsResponse = {
+  cohort_size: 25,
   collisions: [
     {
       start: "2026-11-09",
@@ -46,6 +47,7 @@ const collisions: CollisionsResponse = {
           type: "quiz",
         },
       ],
+      students_affected: 12,
       peak_avg_stress: 8.1,
       peak_date: "2026-11-08",
     },
@@ -72,6 +74,7 @@ const collisions: CollisionsResponse = {
           type: "assignment",
         },
       ],
+      students_affected: 12,
       peak_avg_stress: null,
       peak_date: null,
     },
@@ -137,6 +140,19 @@ describe("rep collision flags", () => {
     expect(averages).toEqual(["28% avg per course", "45% avg per course"]);
   });
 
+  it("shows how many students each pile-up affects and highlights this course", async () => {
+    vi.spyOn(api, "getCollisions").mockResolvedValue(collisions);
+    renderPage();
+
+    const affects = await screen.findAllByText(/^Affects/);
+    expect(affects.map((p) => p.textContent)).toEqual([
+      "Affects 12 of 25 students",
+      "Affects 12 of 25 students",
+    ]);
+    // CPSC 210 is course 1: Midterm 2, Project phase 3, Essay 1 and Lab 2 are its own.
+    expect(screen.getAllByText("This course")).toHaveLength(4);
+  });
+
   it("says Not enough responses when a collision has no nearby stress peak", async () => {
     vi.spyOn(api, "getCollisions").mockResolvedValue(collisions);
     renderPage();
@@ -146,7 +162,7 @@ describe("rep collision flags", () => {
   });
 
   it("shows the empty state when no deadlines collide", async () => {
-    vi.spyOn(api, "getCollisions").mockResolvedValue({ collisions: [] });
+    vi.spyOn(api, "getCollisions").mockResolvedValue({ cohort_size: 25, collisions: [] });
     renderPage();
 
     expect(await screen.findByText("No pile-ups this term")).toBeInTheDocument();
@@ -155,6 +171,7 @@ describe("rep collision flags", () => {
 
   it("says the pile-up is still ahead when it hasn't started yet", async () => {
     vi.spyOn(api, "getCollisions").mockResolvedValue({
+      cohort_size: 25,
       collisions: [
         {
           start: "2099-11-16",
@@ -162,6 +179,7 @@ describe("rep collision flags", () => {
           deadline_count: 3,
           total_weight_pct: 50,
           deadlines: [],
+          students_affected: 12,
           peak_avg_stress: null,
           peak_date: null,
         },

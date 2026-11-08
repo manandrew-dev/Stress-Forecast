@@ -122,11 +122,15 @@ export interface CourseCollision {
   deadline_count: number;
   total_weight_pct: number;
   deadlines: Deadline[];
+  /** Students in this course who'd feel this pile-up given their own courses (≥ min_students). */
+  students_affected: number;
   peak_avg_stress: number | null;
   peak_date: string | null;
 }
 
 export interface CollisionsResponse {
+  /** Students enrolled in this course. */
+  cohort_size: number;
   collisions: CourseCollision[];
 }
 

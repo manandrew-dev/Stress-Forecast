@@ -44,6 +44,8 @@ function Collisions({ courseId }: { courseId: number }) {
               courses={courses}
               peak={{ value: c.peak_avg_stress, date: c.peak_date }}
               byCourse
+              affected={{ students: c.students_affected, cohortSize: q.data.cohort_size }}
+              ownCourseId={courseId}
             />
           ))}
         </div>
