@@ -1,4 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { CalendarRange, HeartPulse, LineChart } from "lucide-react";
 
 import type { Role } from "@/api/types";
@@ -26,12 +27,25 @@ const POINTS = [
 ];
 
 export function LandingPage() {
-  const { user, ready, login } = useAuth();
+  const { mode, user, ready, error, login, consumeJustLoggedIn } = useAuth();
   const navigate = useNavigate();
+  const home = (role: Role) => (role === "rep" ? "/rep" : "/student");
 
-  const enter = (role: Role) => {
-    login(role);
-    navigate({ to: role === "rep" ? "/rep" : "/student" });
+  // Auth0: forward to the right dashboard straight after coming back from the login page.
+  useEffect(() => {
+    if (ready && user && consumeJustLoggedIn()) navigate({ to: home(user.role), replace: true });
+  }, [ready, user, consumeJustLoggedIn, navigate]);
+
+  /** Logged in: open the dashboard. Auth0: go to the login page. Demo: log in as `role`. */
+  const enter = (role: Role = "student") => {
+    if (user) {
+      navigate({ to: home(user.role) });
+    } else if (mode === "auth0") {
+      login();
+    } else {
+      login(role);
+      navigate({ to: home(role) });
+    }
   };
 
   return (
@@ -41,11 +55,11 @@ export function LandingPage() {
         <span className="font-display text-lg font-semibold">Stress Forecast</span>
         <div className="ml-auto">
           {ready && user ? (
-            <Button variant="outline" size="sm" onClick={() => enter(user.role)}>
+            <Button variant="outline" size="sm" onClick={() => enter()}>
               Open my dashboard
             </Button>
           ) : (
-            <Button variant="outline" size="sm" onClick={() => enter("student")}>
+            <Button variant="outline" size="sm" onClick={() => enter()} disabled={!ready}>
               Log in
             </Button>
           )}
@@ -63,19 +77,27 @@ export function LandingPage() {
                 When the whole class is stressed at once, it's usually the calendar.
               </h1>
               <p className="max-w-xl text-lg text-muted-foreground">
-                Stress Forecast connects how students feel with when their deadlines land — so you can see the
-                storm coming, and help move it.
+                Stress Forecast connects how students feel with when their deadlines land — so you
+                can see the storm coming, and help move it.
               </p>
               <div className="flex flex-col gap-3 pt-2 sm:flex-row">
-                <Button variant="hero" size="lg" onClick={() => enter(user?.role ?? "student")}>
+                <Button variant="hero" size="lg" onClick={() => enter()} disabled={!ready}>
                   {ready && user ? "Continue" : "Log in"}
                 </Button>
-                {!(ready && user) && (
+                {mode === "demo" && !(ready && user) && (
                   <Button variant="ghost" size="lg" onClick={() => enter("rep")}>
                     Try it as a class rep
                   </Button>
                 )}
               </div>
+              {error && (
+                <p
+                  role="alert"
+                  className="max-w-xl rounded-xl border border-destructive/40 bg-card px-4 py-3 text-sm"
+                >
+                  {error}
+                </p>
+              )}
             </div>
           </div>
           <img
@@ -98,9 +120,11 @@ export function LandingPage() {
             </div>
           ))}
         </section>
-        <footer className="pb-10 text-center text-xs text-muted-foreground">
-          Demo build — sample data, no real accounts.
-        </footer>
+        {mode === "demo" && (
+          <footer className="pb-10 text-center text-xs text-muted-foreground">
+            Demo build — sample data, no real accounts.
+          </footer>
+        )}
       </main>
     </div>
   );

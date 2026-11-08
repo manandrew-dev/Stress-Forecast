@@ -33,7 +33,7 @@ export interface NavItem {
 }
 
 function RoleMenu() {
-  const { user, switchRole, logout } = useAuth();
+  const { mode, user, switchRole, logout } = useAuth();
   const navigate = useNavigate();
   if (!user) return null;
   const other: Role = user.role === "student" ? "rep" : "student";
@@ -51,18 +51,22 @@ function RoleMenu() {
         <ChevronDown className="size-3.5 text-muted-foreground" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56 rounded-xl">
-        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-          Demo account — no real login yet
-        </DropdownMenuLabel>
-        <DropdownMenuItem
-          onSelect={() => {
-            switchRole(other);
-            navigate({ to: other === "rep" ? "/rep" : "/student" });
-          }}
-        >
-          <Repeat2 className="size-4" /> Switch to {other === "rep" ? "class rep" : "student"}
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
+        {mode === "demo" && switchRole && (
+          <>
+            <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+              Demo account — no real login yet
+            </DropdownMenuLabel>
+            <DropdownMenuItem
+              onSelect={() => {
+                switchRole(other);
+                navigate({ to: other === "rep" ? "/rep" : "/student" });
+              }}
+            >
+              <Repeat2 className="size-4" /> Switch to {other === "rep" ? "class rep" : "student"}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
         <DropdownMenuItem
           onSelect={() => {
             logout();
@@ -109,9 +113,7 @@ export function AppShell({
             <RoleMenu />
           </div>
         </div>
-        {toolbar && (
-          <div className="mx-auto max-w-5xl px-4 pb-3">{toolbar}</div>
-        )}
+        {toolbar && <div className="mx-auto max-w-5xl px-4 pb-3">{toolbar}</div>}
       </header>
 
       <main className="mx-auto max-w-5xl px-4 pt-6 sm:pt-8">{children}</main>
