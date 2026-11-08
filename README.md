@@ -117,6 +117,7 @@ All cohort data is **seeded for the demo**: 40 fictional students across four `D
 - [Auth0 setup](docs/auth0.md)
 - [Rep collision cards](docs/rep-collision-cards.md): how pile-ups and the average per course work
 - [Freebuff screenshots](docs/freebuff/README.md): how to add yours
+- [Entire screenshots](docs/entire/README.md): session history and how to add yours
 
 ## Team
 
