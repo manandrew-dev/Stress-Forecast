@@ -10,7 +10,7 @@
 | Layer | Choice | Owner |
 | --- | --- | --- |
 | Frontend | React + Vite + TypeScript + Tailwind (scaffolded in Lovable) | You (student side), Lawrence (rep side) |
-| Auth | Auth0 (`@auth0/auth0-react` on the frontend, JWT verification on the API) | Keith |
+| Auth | Auth0 (`@auth0/auth0-spa-js` on the frontend, JWT verification on the API) | Keith |
 | API | Python 3.11+, FastAPI | Keith |
 | Database | Tiger Data (managed Postgres + TimescaleDB) | Keith |
 | AI | Gemini API via the `google-genai` Python SDK, structured JSON output | Khan |
@@ -176,7 +176,7 @@ Notes:
 
 ## 5. Auth (Auth0)
 
-- **Frontend:** `@auth0/auth0-react`. Request an access token for our API's **audience** and send it as `Authorization: Bearer <token>` on every request.
+- **Frontend:** `@auth0/auth0-spa-js` (`frontend/src/auth/auth0.ts`), loaded in the browser only. `@auth0/auth0-react` was the plan, but it throws during TanStack Start's server render as soon as it's imported. Request an access token for our API's **audience** and send it as `Authorization: Bearer <token>` on every request. Sessions survive reloads with refresh tokens, which need **Allow Offline Access** on the API and **Refresh Token Rotation** on the SPA (see [auth0.md](auth0.md)).
 - **Roles:** create `student` and `rep` roles in Auth0. A **Post-Login Action** adds them to the access token as a custom claim:
   `https://stressforecast.app/roles` → `["student"]` or `["rep"]`.
 - **API:** `auth.py` verifies RS256 access tokens against the tenant JWKS and validates issuer, audience, subject, and time claims. It synchronizes the verified subject and application role with `users`.
