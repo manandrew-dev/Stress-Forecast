@@ -6,6 +6,16 @@ Built at HackCamp 2026. Students do a 30-second daily check-in and upload their 
 
 **Figma:** https://www.figma.com/design/RnZfnSDgXSIwCTBCtCm2DH/Stress-Forecast?node-id=2-4&t=tqvBF1zWmvZsywUi-1
 
+## Inspiration
+
+Every term has that week. Group chats go quiet, the library fills up at midnight, and everyone you ask is running on four hours of sleep. As students, we noticed it was never just one of us: the same people hit the wall in the same week, because their midterms, projects and quizzes had all landed in the same five days.
+
+What struck us was that nobody was doing anything wrong. Each instructor set reasonable dates for their own course; they just couldn't see what every other course was asking of the same students that week. And the advice we got was always about coping on our own: plan better, sleep more, try meditating. That treats a scheduling problem as a personal one.
+
+So we flipped the question. Instead of helping one student cope, what if we could see the stress of a whole class, line it up against every deadline, and show the people who set those dates exactly where the pile-ups are? A rep could walk into a meeting with evidence, not anecdotes: "3 assessments worth 55% in five days, and stress peaked right before." Moving one date by a week costs an instructor almost nothing and spares a whole class its worst week.
+
+That's Stress Forecast: fix the schedule, not the student.
+
 ## The problem
 
 Stress is shared and predictable. When three midterms and a project land in the same five days, a whole class suffers together, yet the instructors who set those dates each see only their own course. Most wellbeing apps help one student cope. Stress Forecast finds the cause across a group and shows it to the people who can change the schedule.
