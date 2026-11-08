@@ -198,7 +198,13 @@ def test_collisions_report_insights(mocked):
                 assert call["aggregates"] and all(len(p) == 2 for p in call["aggregates"])
                 assert all("2026-10-26" <= p[0].isoformat() <= "2026-11-08" for p in call["aggregates"])
 
-                assert (await c.get(f"/api/courses/{focus}/insights")).json() == {"insights": []}
+                # Rows written by the Databricks notebook, if it has run; newest week first, no ids.
+                insights = (await c.get(f"/api/courses/{focus}/insights")).json()["insights"]
+                expected = await _conn.fetchval("SELECT count(*) FROM insights WHERE course_id = $1", focus)
+                assert len(insights) == expected
+                assert all(set(i) == {"week_start", "finding"} and i["finding"] for i in insights)
+                weeks = [i["week_start"] for i in insights]
+                assert weeks == sorted(weeks, reverse=True)
 
     run(go())
 
