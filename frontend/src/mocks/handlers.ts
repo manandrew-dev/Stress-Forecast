@@ -1,10 +1,12 @@
 // Mock implementations of every endpoint. Return values use the exact API shapes.
 import { ApiError } from "@/api/errors";
+import { DEADLINE_TYPES } from "@/api/types";
 import type {
   CheckinResponse,
   CohortResponse,
   CollisionsResponse,
   CoursesResponse,
+  DateRange,
   Deadline,
   DeadlineDraft,
   HeadsUpResponse,
@@ -37,7 +39,8 @@ const latency = () => sleep(350 + Math.random() * 350);
 
 function requireUser(user: AuthUser | null, role?: Role): AuthUser {
   if (!user) throw new ApiError("unauthorized", "Please log in.", 401);
-  if (role && user.role !== role) throw new ApiError("forbidden", "You don't have access to this.", 403);
+  if (role && user.role !== role)
+    throw new ApiError("forbidden", "You don't have access to this.", 403);
   return user;
 }
 
@@ -50,7 +53,8 @@ function courseById(id: number) {
 function requireRepCourse(user: AuthUser | null, id: number) {
   requireUser(user, "rep");
   const course = courseById(id);
-  if (!REP_COURSE_IDS.includes(id)) throw new ApiError("forbidden", "You're not the rep for this course.", 403);
+  if (!REP_COURSE_IDS.includes(id))
+    throw new ApiError("forbidden", "You're not the rep for this course.", 403);
   return course;
 }
 
@@ -97,11 +101,15 @@ export async function postSyllabus(
 ): Promise<SyllabusResponse> {
   requireUser(user, "student");
   courseById(input.course_id);
-  if (input.file && input.file.type !== "application/pdf" && !input.file.name.toLowerCase().endsWith(".pdf")) {
-    throw new ApiError("unsupported_file", "Please upload a PDF file.", 415);
+  if (
+    input.file &&
+    input.file.type !== "application/pdf" &&
+    !input.file.name.toLowerCase().endsWith(".pdf")
+  ) {
+    throw new ApiError("bad_request", "Please upload a PDF file.", 400);
   }
   if (!input.file && !input.text?.trim()) {
-    throw new ApiError("empty_syllabus", "Paste some syllabus text or upload a PDF.", 422);
+    throw new ApiError("bad_request", "Paste some syllabus text or upload a PDF.", 400);
   }
   // Real parsing can take ~15s; keep the mock shorter but long enough to see the loading state.
   await sleep(6000);
@@ -115,25 +123,86 @@ export async function postDeadlines(
   await latency();
   requireUser(user, "student");
   courseById(body.course_id);
+  body.deadlines.forEach(validateDraft);
   const state = getState();
-  const existing = allDeadlines();
+  // Replace semantics (docs/api.md): drop this student's earlier deadlines for the course.
+  // In the mock, extraDeadlines are all created by the demo student; BASE_DEADLINES are seed data.
+  const kept = state.extraDeadlines.filter((e) => e.course_id !== body.course_id);
   let nextId = state.nextDeadlineId;
   const saved: Deadline[] = [];
   const added: Deadline[] = [];
   for (const d of body.deadlines) {
-    const match = existing.find(
+    // Mock-only: reuse a matching seeded deadline so the demo timeline doesn't show duplicates.
+    const seeded = BASE_DEADLINES.find(
       (e) => e.course_id === body.course_id && e.title === d.title && e.due_date === d.due_date,
     );
-    if (match) {
-      saved.push(match);
+    if (seeded) {
+      saved.push(seeded);
     } else {
       const created: Deadline = { id: nextId++, course_id: body.course_id, ...d };
       saved.push(created);
       added.push(created);
     }
   }
-  setState({ extraDeadlines: [...state.extraDeadlines, ...added], nextDeadlineId: nextId });
+  setState({ extraDeadlines: [...kept, ...added], nextDeadlineId: nextId });
   return { deadlines: saved };
+}
+
+function validateDraft(d: DeadlineDraft): void {
+  if (!d.title?.trim()) throw new ApiError("bad_request", "Every deadline needs a title.", 400);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d.due_date ?? "")) {
+    throw new ApiError("bad_request", "Due dates must be YYYY-MM-DD.", 400);
+  }
+  if (!DEADLINE_TYPES.includes(d.type))
+    throw new ApiError("bad_request", "Unknown deadline type.", 400);
+  if (
+    d.weight_pct !== null &&
+    (typeof d.weight_pct !== "number" || d.weight_pct < 0 || d.weight_pct > 100)
+  ) {
+    throw new ApiError("bad_request", "Weight must be between 0 and 100.", 400);
+  }
+}
+
+/** Deadlines the demo student created and may edit; seeded ones belong to someone else. */
+function ownDeadline(id: number): Deadline {
+  const own = getState().extraDeadlines.find((d) => d.id === id);
+  if (own) return own;
+  if (BASE_DEADLINES.some((d) => d.id === id)) {
+    throw new ApiError("forbidden", "You can only change deadlines you added.", 403);
+  }
+  throw new ApiError("not_found", "Deadline not found.", 404);
+}
+
+export async function putDeadline(
+  user: AuthUser | null,
+  id: number,
+  draft: DeadlineDraft,
+): Promise<Deadline> {
+  await latency();
+  requireUser(user, "student");
+  const current = ownDeadline(id);
+  validateDraft(draft);
+  const updated: Deadline = {
+    id: current.id,
+    course_id: current.course_id,
+    title: draft.title,
+    due_date: draft.due_date,
+    weight_pct: draft.weight_pct,
+    type: draft.type,
+  };
+  setState({ extraDeadlines: getState().extraDeadlines.map((d) => (d.id === id ? updated : d)) });
+  return updated;
+}
+
+export async function deleteDeadline(user: AuthUser | null, id: number): Promise<void> {
+  await latency();
+  requireUser(user, "student");
+  ownDeadline(id);
+  setState({ extraDeadlines: getState().extraDeadlines.filter((d) => d.id !== id) });
+}
+
+function inRange(date: string, range: DateRange): boolean {
+  return (!range.from || date >= range.from) && (!range.to || date <= range.to);
 }
 
 function isoNowOn(day: string): string {
@@ -147,7 +216,8 @@ function isoNowOn(day: string): string {
 export async function postCheckin(user: AuthUser | null, text: string): Promise<CheckinResponse> {
   await sleep(1200);
   requireUser(user, "student");
-  if (!text.trim()) throw new ApiError("empty_checkin", "Tell us a little about your day first.", 422);
+  if (!text.trim())
+    throw new ApiError("bad_request", "Tell us a little about your day first.", 400);
   const result = analyzeCheckin(text);
   const replaced_earlier = getState().todayCheckin !== null;
   setState({
@@ -156,18 +226,29 @@ export async function postCheckin(user: AuthUser | null, text: string): Promise<
   return { time: isoNowOn(MOCK_TODAY), ...result, replaced_earlier };
 }
 
-export async function getMyTrend(user: AuthUser | null): Promise<TrendResponse> {
+export async function getMyTrend(
+  user: AuthUser | null,
+  range: DateRange = {},
+): Promise<TrendResponse> {
   await latency();
   requireUser(user, "student");
   const deadlines = enrolledDeadlines();
-  return { points: studentTrend(deadlines, getState().todayCheckin), deadlines };
+  return {
+    points: studentTrend(deadlines, getState().todayCheckin).filter((p) => inRange(p.date, range)),
+    deadlines: deadlines.filter((d) => inRange(d.due_date, range)),
+  };
 }
 
 function headsUpMessage(c: DetectedCollision): string {
   const days = diffDays(c.end, c.start) + 1;
   const first = c.deadlines[0]!;
   const startsIn = diffDays(c.start, MOCK_TODAY);
-  const when = startsIn <= 0 ? "starting today" : startsIn === 1 ? "starting tomorrow" : `starting ${startsIn} days from now`;
+  const when =
+    startsIn <= 0
+      ? "starting today"
+      : startsIn === 1
+        ? "starting tomorrow"
+        : `starting ${startsIn} days from now`;
   return `${c.deadline_count} assessments worth ${c.total_weight_pct}% are packed into ${days} days, ${when}. Getting a head start on ${first.title} (${courseCode(first.course_id)}) this weekend will make that stretch much lighter.`;
 }
 
@@ -183,11 +264,20 @@ export async function getHeadsUp(user: AuthUser | null): Promise<HeadsUpResponse
 
 // ---------- rep ----------
 
-export async function getCohort(user: AuthUser | null, courseId: number): Promise<CohortResponse> {
+export async function getCohort(
+  user: AuthUser | null,
+  courseId: number,
+  range: DateRange = {},
+): Promise<CohortResponse> {
   await latency();
   const course = requireRepCourse(user, courseId);
   const deadlines = allDeadlines();
-  return { course, min_students: MIN_STUDENTS, days: cohortDays(courseId, deadlines), deadlines };
+  return {
+    course,
+    min_students: MIN_STUDENTS,
+    days: cohortDays(courseId, deadlines).filter((d) => inRange(d.date, range)),
+    deadlines: deadlines.filter((d) => inRange(d.due_date, range)),
+  };
 }
 
 function collisionsFor(courseId: number) {
@@ -197,7 +287,11 @@ function collisionsFor(courseId: number) {
     .filter((c) => c.deadlines.some((d) => d.course_id === courseId))
     .map((c) => {
       const near = days.filter(
-        (d) => !d.suppressed && d.avg_stress !== null && d.date >= addDays(c.start, -3) && d.date <= addDays(c.end, 1),
+        (d) =>
+          !d.suppressed &&
+          d.avg_stress !== null &&
+          d.date >= addDays(c.start, -3) &&
+          d.date <= addDays(c.end, 1),
       );
       const peak = near.reduce<(typeof near)[number] | null>(
         (best, d) => (best && (best.avg_stress ?? 0) >= (d.avg_stress ?? 0) ? best : d),
@@ -207,7 +301,10 @@ function collisionsFor(courseId: number) {
     });
 }
 
-export async function getCollisions(user: AuthUser | null, courseId: number): Promise<CollisionsResponse> {
+export async function getCollisions(
+  user: AuthUser | null,
+  courseId: number,
+): Promise<CollisionsResponse> {
   await latency();
   requireRepCourse(user, courseId);
   return { collisions: collisionsFor(courseId) };
@@ -218,7 +315,9 @@ function suggestShift(target: Deadline): number | null {
   const others = allDeadlines().filter((d) => d.id !== target.id);
   for (const shift of [-7, 7, -14, 14]) {
     const moved = { ...target, due_date: addDays(target.due_date, shift) };
-    const hit = detectCollisions([...others, moved]).some((c) => c.deadlines.some((d) => d.id === target.id));
+    const hit = detectCollisions([...others, moved]).some((c) =>
+      c.deadlines.some((d) => d.id === target.id),
+    );
     if (!hit) return shift;
   }
   return null;
@@ -227,22 +326,25 @@ function suggestShift(target: Deadline): number | null {
 export async function getReport(
   user: AuthUser | null,
   courseId: number,
-  weekStart: string,
+  weekStart?: string,
 ): Promise<WeeklyReport> {
   await latency();
   requireRepCourse(user, courseId);
-  const week_start = weekStartOf(weekStart);
+  // Omitted = the current week (docs/api.md).
+  const week_start = weekStartOf(weekStart ?? MOCK_TODAY);
   const weekEnd = addDays(week_start, 6);
   const days = cohortDays(courseId, allDeadlines()).filter(
     (d) => d.date >= week_start && d.date <= weekEnd && !d.suppressed && d.avg_stress !== null,
   );
   if (days.length === 0) {
-    throw new ApiError("no_data", "There aren't enough check-ins for this week yet.", 404);
+    throw new ApiError("not_found", "There aren't enough check-ins for this week yet.", 404);
   }
   const avg = days.reduce((s, d) => s + (d.avg_stress ?? 0), 0) / days.length;
   const peak = days.reduce((a, b) => ((a.avg_stress ?? 0) >= (b.avg_stress ?? 0) ? a : b));
   const collision = collisionsFor(courseId).find((c) => c.start <= weekEnd && c.end >= week_start);
-  const weekDeadlines = allDeadlines().filter((d) => d.due_date >= week_start && d.due_date <= weekEnd);
+  const weekDeadlines = allDeadlines().filter(
+    (d) => d.due_date >= week_start && d.due_date <= weekEnd,
+  );
 
   if (collision) {
     const mine = collision.deadlines.find((d) => d.course_id === courseId)!;
@@ -271,11 +373,15 @@ export async function getReport(
     week_start,
     summary: `A calm week — average stress was ${avg.toFixed(1)} and no major deadlines were due.`,
     top_cause: "General workload",
-    suggested_fix: "Nothing to fix. A good week for a check-in reminder so next week's data is solid.",
+    suggested_fix:
+      "Nothing to fix. A good week for a check-in reminder so next week's data is solid.",
   };
 }
 
-export async function getInsights(user: AuthUser | null, courseId: number): Promise<InsightsResponse> {
+export async function getInsights(
+  user: AuthUser | null,
+  courseId: number,
+): Promise<InsightsResponse> {
   await latency();
   requireRepCourse(user, courseId);
   return { insights: INSIGHTS[courseId] ?? [] };
