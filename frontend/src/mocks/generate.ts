@@ -1,69 +1,138 @@
+// Port of db/seed.py's generate_checkins(): 40 students (index 0 is the demo student),
+// the same enrolment patterns, deadline-load curve, skip rate and low-response day, so
+// mock charts have the same shape as the seeded database. The random stream differs from
+// Python's, so individual values differ slightly; averages and spikes line up.
 import type { CohortDay, Deadline, TrendPoint } from "@/api/types";
-import { addDays, dayRange, diffDays, parseDay } from "@/lib/dates";
-import { COHORT_SIZE, MOCK_TODAY, SUPPRESSED_DAYS, TERM_START } from "./data";
+import { addDays, dayRange, diffDays } from "@/lib/dates";
+import { COURSES, DEMO_STUDENT_COURSE_IDS, MIN_STUDENTS, MOCK_TODAY, TERM_START } from "./data";
 
-/** Deterministic pseudo-random number in [0, 1) from a string seed. */
-function noise(seed: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < seed.length; i++) {
-    h ^= seed.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return ((h >>> 0) % 10000) / 10000;
+const STUDENT_COUNT = 40;
+/** Only 4 students check in that day, so every course is suppressed (< MIN_STUDENTS). */
+const LOW_RESPONSE_DAY = "2026-09-13";
+const SKIP_RATE = 0.16;
+/** Indexes into COURSES, cycled over the students (seed's _ENROLLMENT_PATTERNS). */
+const ENROLLMENT_PATTERNS = [
+  [0, 1],
+  [0, 2],
+  [0, 3],
+  [1, 2],
+  [1, 3],
+  [2, 3],
+  [0, 1, 2],
+  [0, 2, 3],
+];
+/** Days before a deadline → share of its load (seed's _DEADLINE_LOAD). */
+const DEADLINE_LOAD: Record<number, number> = { 3: 0.45, 2: 0.75, 1: 1.0, 0: 0.7 };
+
+interface SimCheckin {
+  date: string;
+  stress: number;
+  sleep_hours: number | null;
+}
+
+interface SimStudent {
+  courseIds: number[];
+  checkins: SimCheckin[];
+}
+
+/** Small deterministic PRNG (mulberry32), seeded like the Python fixture. */
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
+const round2 = (n: number) => Math.round(n * 100) / 100;
 
 /**
- * Deadline "load" on a day: stress ramps up over the 3 days before a deadline,
- * peaks on the day, and eases off the day after. Overlapping load compounds.
+ * Simulates the first `count` students from TERM_START up to (not including) MOCK_TODAY.
+ * Draws happen in the same order as the seed, so student 0's history doesn't depend on
+ * how many students are simulated or which courses they take.
  */
-function deadlineLoad(day: string, deadlines: Deadline[]): number {
-  let load = 0;
-  for (const d of deadlines) {
-    const w = d.weight_pct ?? 3;
-    const until = diffDays(d.due_date, day);
-    if (until >= 0 && until <= 3) load += (w / 10) * (1 - until / 4);
-    else if (until === -1) load += (w / 10) * 0.35;
+function simulate(
+  deadlines: Deadline[],
+  demoStudentCourses: number[],
+  count = STUDENT_COUNT,
+): SimStudent[] {
+  const rng = mulberry32(2026);
+  const uniform = (lo: number, hi: number) => lo + (hi - lo) * rng();
+  const days = dayRange(TERM_START, addDays(MOCK_TODAY, -1));
+  const students: SimStudent[] = [];
+
+  for (let index = 0; index < count; index++) {
+    const pattern = ENROLLMENT_PATTERNS[index % ENROLLMENT_PATTERNS.length]!;
+    const courseIds = index === 0 ? demoStudentCourses : pattern.map((i) => COURSES[i]!.id);
+    const mine = deadlines.filter((d) => courseIds.includes(d.course_id));
+    const baseline = uniform(2.5, 4.1);
+    const sensitivity = uniform(0.8, 1.2);
+    const checkins: SimCheckin[] = [];
+
+    for (const date of days) {
+      if (date === LOW_RESPONSE_DAY) {
+        if (index >= MIN_STUDENTS - 1) continue;
+      } else if (index > 0 && rng() < SKIP_RATE) {
+        continue;
+      }
+      const load = mine.reduce(
+        (sum, d) =>
+          sum + ((d.weight_pct ?? 0) / 8) * (DEADLINE_LOAD[diffDays(d.due_date, date)] ?? 0),
+        0,
+      );
+      const stress = Math.min(
+        10,
+        Math.max(1, Math.round(baseline + sensitivity * load + uniform(-0.65, 0.65))),
+      );
+      const sleep_hours = rng() < 0.1 ? null : round1(8.8 - stress * 0.35 + uniform(-0.5, 0.5));
+      checkins.push({ date, stress, sleep_hours });
+    }
+    students.push({ courseIds, checkins });
   }
-  return load + 0.12 * load * load;
+  return students;
 }
 
-function stressFor(day: string, deadlines: Deadline[], seed: string): number {
-  const dow = parseDay(day).getUTCDay();
-  const weekend = dow === 0 || dow === 6 ? -0.4 : 0;
-  const drift = diffDays(day, TERM_START) * 0.012;
-  const jitter = (noise(seed + day) - 0.5) * 0.9;
-  const value = 2.8 + drift + weekend + jitter + deadlineLoad(day, deadlines);
-  return Math.min(9.6, Math.max(1, round1(value)));
-}
-
-export function cohortDays(courseId: number, deadlines: Deadline[]): CohortDay[] {
-  const size = COHORT_SIZE[courseId] ?? 30;
-  return dayRange(TERM_START, MOCK_TODAY).map((date) => {
-    if (SUPPRESSED_DAYS.has(date)) {
+/**
+ * Daily cohort stress for one course, like the daily_course_stress aggregate: the average over
+ * enrolled students who checked in that day, suppressed when fewer than MIN_STUDENTS did.
+ */
+export function cohortDays(
+  courseId: number,
+  deadlines: Deadline[],
+  demoStudentCourses: number[] = DEMO_STUDENT_COURSE_IDS,
+): CohortDay[] {
+  const byDay = new Map<string, number[]>();
+  for (const s of simulate(deadlines, demoStudentCourses)) {
+    if (!s.courseIds.includes(courseId)) continue;
+    for (const c of s.checkins) {
+      const list = byDay.get(c.date) ?? [];
+      list.push(c.stress);
+      byDay.set(c.date, list);
+    }
+  }
+  return dayRange(TERM_START, addDays(MOCK_TODAY, -1)).map((date) => {
+    const values = byDay.get(date) ?? [];
+    if (values.length < MIN_STUDENTS) {
       return { date, avg_stress: null, n_students: null, suppressed: true };
     }
-    const responders = Math.round(size * (0.35 + noise(`n${courseId}${date}`) * 0.4));
     return {
       date,
-      avg_stress: stressFor(date, deadlines, `c${courseId}`),
-      n_students: responders,
+      avg_stress: round2(values.reduce((a, b) => a + b, 0) / values.length),
+      n_students: values.length,
       suppressed: false,
     };
   });
 }
 
+/** The demo student's own history (seed student 0: checks in every day), plus today's check-in. */
 export function studentTrend(deadlines: Deadline[], today: TrendPoint | null): TrendPoint[] {
-  const points: TrendPoint[] = [];
-  for (const date of dayRange(TERM_START, addDays(MOCK_TODAY, -1))) {
-    // Students skip some days.
-    if (noise(`skip${date}`) < 0.22) continue;
-    const stress = Math.round(stressFor(date, deadlines, "me") + (noise(`me2${date}`) - 0.5));
-    const clamped = Math.min(10, Math.max(1, stress));
-    const sleep = noise(`sl${date}`) < 0.15 ? null : round1(8.2 - clamped * 0.35 + noise(`s${date}`));
-    points.push({ date, stress: clamped, sleep_hours: sleep });
-  }
+  const courseIds = [...new Set(deadlines.map((d) => d.course_id))];
+  const [me] = simulate(deadlines, courseIds, 1);
+  const points: TrendPoint[] = (me?.checkins ?? []).map((c) => ({ ...c }));
   if (today) points.push(today);
   return points;
 }

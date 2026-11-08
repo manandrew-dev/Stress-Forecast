@@ -1,4 +1,5 @@
 import type { Deadline, TrendPoint } from "@/api/types";
+import { DEMO_STUDENT_COURSE_IDS } from "./data";
 
 // Mutable mock "server" state. Persisted to localStorage so the demo survives a refresh.
 interface MockState {
@@ -8,10 +9,12 @@ interface MockState {
   nextDeadlineId: number;
 }
 
-const KEY = "stress-forecast:mock-state";
+// v2: mock data now mirrors db/seed.py; old saved state (old deadline ids) is ignored.
+const KEY = "stress-forecast:mock-state:v2";
 
 const initial = (): MockState => ({
-  enrolledCourseIds: [],
+  // The seeded demo student starts enrolled in DEMO CPSC 210 + DEMO MATH 200 (db/seed.py).
+  enrolledCourseIds: [...DEMO_STUDENT_COURSE_IDS],
   extraDeadlines: [],
   todayCheckin: null,
   nextDeadlineId: 1000,

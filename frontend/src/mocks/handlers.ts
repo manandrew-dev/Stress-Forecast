@@ -264,13 +264,15 @@ export async function getCohort(
     min_students: MIN_STUDENTS,
     // Stress is simulated from every deadline (students take several courses),
     // but the response lists only this course's deadlines, like the backend.
-    days: cohortDays(courseId, allDeadlines()).filter((d) => inRange(d.date, range)),
+    days: cohortDays(courseId, allDeadlines(), getState().enrolledCourseIds).filter((d) =>
+      inRange(d.date, range),
+    ),
     deadlines: courseDeadlines(courseId).filter((d) => inRange(d.due_date, range)),
   };
 }
 
 function collisionsFor(courseId: number) {
-  const daily = cohortDays(courseId, allDeadlines()).flatMap((d) =>
+  const daily = cohortDays(courseId, allDeadlines(), getState().enrolledCourseIds).flatMap((d) =>
     !d.suppressed && d.avg_stress !== null ? [{ date: d.date, avg_stress: d.avg_stress }] : [],
   );
   return repCollisions(courseDeadlines(courseId), daily);
@@ -308,7 +310,7 @@ export async function getReport(
   // Omitted = the current week (docs/api.md).
   const week_start = weekStartOf(weekStart ?? MOCK_TODAY);
   const weekEnd = addDays(week_start, 6);
-  const days = cohortDays(courseId, allDeadlines()).filter(
+  const days = cohortDays(courseId, allDeadlines(), getState().enrolledCourseIds).filter(
     (d) => d.date >= week_start && d.date <= weekEnd && !d.suppressed && d.avg_stress !== null,
   );
   if (days.length === 0) {
