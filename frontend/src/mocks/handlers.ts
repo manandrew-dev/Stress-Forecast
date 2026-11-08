@@ -21,7 +21,7 @@ import type {
 import type { AuthUser } from "@/auth/session";
 import { addDays, diffDays, longDate, rangeLabel, shortDate, weekStartOf } from "@/lib/dates";
 import { analyzeCheckin } from "./checkin";
-import { detectCollisions, headsUp, repCollisions } from "./collisions";
+import { crossCourseRepCollisions, detectCollisions, headsUp, sharedCourseIds } from "./collisions";
 import {
   BASE_DEADLINES,
   COURSES,
@@ -31,7 +31,7 @@ import {
   REP_COURSE_IDS,
   SYLLABUS_EXTRACTS,
 } from "./data";
-import { cohortDays, studentTrend } from "./generate";
+import { cohortDays, studentCourseIds, studentTrend } from "./generate";
 import { getState, setState } from "./store";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -70,6 +70,17 @@ function enrolledDeadlines(): Deadline[] {
 /** One course's deadlines: what the backend uses for every rep endpoint (architecture.md §7). */
 function courseDeadlines(courseId: number): Deadline[] {
   return allDeadlines().filter((d) => d.course_id === courseId);
+}
+
+/** Every fake student's course ids, with the demo student's current enrolment. */
+function students(): number[][] {
+  return studentCourseIds(getState().enrolledCourseIds);
+}
+
+/** This course's deadlines plus its shared courses' (docs/api.md, collisions). */
+function repDeadlines(courseId: number): Deadline[] {
+  const shared = sharedCourseIds(courseId, students(), MIN_STUDENTS);
+  return allDeadlines().filter((d) => d.course_id === courseId || shared.includes(d.course_id));
 }
 
 function courseCode(id: number) {
@@ -267,7 +278,7 @@ export async function getCohort(
     days: cohortDays(courseId, allDeadlines(), getState().enrolledCourseIds).filter((d) =>
       inRange(d.date, range),
     ),
-    deadlines: courseDeadlines(courseId).filter((d) => inRange(d.due_date, range)),
+    deadlines: repDeadlines(courseId).filter((d) => inRange(d.due_date, range)),
   };
 }
 
@@ -275,7 +286,7 @@ function collisionsFor(courseId: number) {
   const daily = cohortDays(courseId, allDeadlines(), getState().enrolledCourseIds).flatMap((d) =>
     !d.suppressed && d.avg_stress !== null ? [{ date: d.date, avg_stress: d.avg_stress }] : [],
   );
-  return repCollisions(courseDeadlines(courseId), daily);
+  return crossCourseRepCollisions(courseId, allDeadlines(), students(), daily, MIN_STUDENTS);
 }
 
 export async function getCollisions(
@@ -284,12 +295,15 @@ export async function getCollisions(
 ): Promise<CollisionsResponse> {
   await latency();
   requireRepCourse(user, courseId);
-  return { collisions: collisionsFor(courseId) };
+  return {
+    cohort_size: students().filter((s) => s.includes(courseId)).length,
+    collisions: collisionsFor(courseId),
+  };
 }
 
 /** Find a shift (in days) that takes `target` out of every collision. */
 function suggestShift(target: Deadline): number | null {
-  const others = courseDeadlines(target.course_id).filter((d) => d.id !== target.id);
+  const others = repDeadlines(target.course_id).filter((d) => d.id !== target.id);
   for (const shift of [-7, 7, -14, 14]) {
     const moved = { ...target, due_date: addDays(target.due_date, shift) };
     const hit = detectCollisions([...others, moved]).some((c) =>
@@ -324,8 +338,9 @@ export async function getReport(
   );
 
   if (collision) {
-    // Suggest moving the last item in the pile-up; pushing it later is usually the easiest fix.
-    const mine = collision.deadlines.at(-1)!;
+    // Suggest moving this course's last item in the pile-up: it's the date the rep can ask
+    // about, and pushing it later is usually the easiest fix.
+    const mine = collision.deadlines.filter((d) => d.course_id === courseId).at(-1)!;
     const shift = suggestShift(mine);
     const list = collision.deadlines.map((d) => `${courseCode(d.course_id)} ${d.title}`).join(", ");
     return {

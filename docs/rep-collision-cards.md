@@ -67,11 +67,14 @@ The average makes a pile-up spread across several courses look smaller (the exam
 
 The card is shared with the student heads-up card. The per-course view is turned on with the `byCourse` prop, which only the rep page passes, so the student card still shows the combined total.
 
-## Not built yet
+## Status
 
-This page describes the agreed design. Still to do:
+Done (frontend):
 
-- **Backend (#17):** shared courses, the own-course rule, `students_affected` and `cohort_size`.
-- **Sample data:** mirror the new rules in `frontend/src/mocks/` and match the seed's deadlines.
-- **Seed (`db/seed.py`):** add one week where a CPSC 210 deadline lands near other shared courses' deadlines, so the demo shows a cross-course pile-up.
-- **Card:** show "Affects X of Y students" and highlight the rep's own deadlines.
+- **Card:** "Affects X of Y students" and a "This course" badge on the rep's own deadlines (`CollisionCard.tsx`, `DeadlineRow.tsx`).
+- **Sample data:** `frontend/src/mocks/` follows the new rules (`crossCourseRepCollisions` and `sharedCourseIds` in `collisions.ts`), using the seed's courses, deadlines and student course combinations. Example: DEMO CPSC 210's finals week (CPSC 20%, PHYS 35%, MATH 40%) affects 20 of 25 students.
+
+Still to do:
+
+- **Backend (#17):** shared courses, the own-course rule, `students_affected` and `cohort_size`. Until then, switching off sample data shows single-course pile-ups and no "Affects" line.
+- **Seed (`db/seed.py`):** optional; the finals week already gives the demo a cross-course pile-up.
