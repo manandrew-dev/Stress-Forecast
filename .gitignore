@@ -154,3 +154,16 @@ vite.config.ts.timestamp-*
 # Repository-local coding agent directories
 /.claude/
 /.codex/
+
+# Local Python environments and caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Local PostgreSQL credentials and backups
+.pgpass
+*-credentials.txt
+*.dump
+*.pgdump

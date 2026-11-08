@@ -124,30 +124,32 @@ CREATE TABLE checkins (
   stress       SMALLINT NOT NULL CHECK (stress BETWEEN 1 AND 10),
   sleep_hours  NUMERIC,
   causes       TEXT[] NOT NULL DEFAULT '{}',
-  raw_text     TEXT NOT NULL
+  raw_text     TEXT NOT NULL,
+  PRIMARY KEY (user_id, time)
 );
-SELECT create_hypertable('checkins', 'time');
+SELECT create_hypertable('checkins', by_range('time'));
 
 -- Fan-out: one row per (check-in, enrolled course). Written by the API in the same
 -- transaction as the check-in. Lets the continuous aggregate group by course without joins.
 CREATE TABLE checkin_course (
   time       TIMESTAMPTZ NOT NULL,
-  course_id  INT  NOT NULL,
-  user_id    TEXT NOT NULL,
-  stress     SMALLINT NOT NULL
+  course_id  INT  NOT NULL REFERENCES courses(id),
+  user_id    TEXT NOT NULL REFERENCES users(id),
+  stress     SMALLINT NOT NULL CHECK (stress BETWEEN 1 AND 10),
+  PRIMARY KEY (user_id, time, course_id)
 );
-SELECT create_hypertable('checkin_course', 'time');
+SELECT create_hypertable('checkin_course', by_range('time'));
 
--- Daily cohort stress per course. One check-in per student per day is enforced by the API
--- (re-check-ins replace the earlier row), so count(*) = distinct students.
+-- Daily cohort stress per course. Count distinct students for the privacy threshold.
 CREATE MATERIALIZED VIEW daily_course_stress
 WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
-SELECT time_bucket('1 day', time) AS day,
+SELECT time_bucket(INTERVAL '1 day', time, timezone => 'America/Vancouver') AS day,
        course_id,
        avg(stress)::NUMERIC(4,2)  AS avg_stress,
-       count(*)                   AS n_students
+       count(DISTINCT user_id)    AS n_students
 FROM checkin_course
-GROUP BY day, course_id;
+GROUP BY day, course_id
+WITH NO DATA;
 
 SELECT add_continuous_aggregate_policy('daily_course_stress',
   start_offset => INTERVAL '120 days',
@@ -166,8 +168,10 @@ CREATE TABLE insights (
 
 Notes:
 
-- `materialized_only = false` makes the aggregate include data not yet materialized, so fresh check-ins show up in the demo immediately.
-- Timezone: bucket days in `America/Vancouver` if day boundaries look off (`time_bucket('1 day', time, 'America/Vancouver')`).
+- Apply `db/schema.sql` once to a fresh database with TimescaleDB support. The executable schema includes indexes for course and creator deadline lookups, course time ranges, and weekly insights.
+- The real-time aggregate includes recent check-ins beyond the materialized range. Changes to older, materialized days appear after refresh.
+- Use `America/Vancouver` for check-in replacement and cohort dates. Compute the range from local midnight to the next local midnight so daylight saving transitions are handled correctly. Convert `day` to the same timezone before returning an API date.
+- The hypertable keys reject duplicate timestamps for a user or user/course. For same-day replacement, Issue #16 should lock the student’s `users` row first, then replace the check-in and course rows for that local day in one transaction. TimescaleDB supports foreign keys from each hypertable to ordinary tables. The transaction also maintains the relationship between the two hypertables.
 - Only `cohort.py` may query `daily_course_stress`, and every query there filters `n_students >= COHORT_MIN`.
 
 ## 5. Auth (Auth0)
