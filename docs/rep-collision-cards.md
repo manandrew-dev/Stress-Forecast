@@ -1,15 +1,16 @@
 # Rep collision cards
 
-How the rep's **Pile-ups** page (`frontend/src/pages/rep/CollisionsPage.tsx`) shows each collision. Which windows count as a collision is decided by the backend (`docs/requirements.md` §4); this page only covers how they're displayed.
+How the rep's **Pile-ups** page (`frontend/src/pages/rep/CollisionsPage.tsx`) shows each collision.
 
-> **Sample data vs the real backend:** the backend flags a 5-day window with 3+ assessments or 40%+ combined weight (`backend/app/config.py`). The sample data in `frontend/src/mocks/collisions.ts` uses a looser rule (2+ assessments and 30%+), so some demo cards, like Oct 6–8 (2 assessments, 35%), only appear with sample data. It also searches one extra day past the window for the stress peak.
+**Pile-ups mix courses (changed Nov 7).** A rep's pile-ups include the deadlines of other courses that at least 5 of the class also take, as long as the window has at least one deadline of the rep's own course. Each card says how many of the class it actually affects. The rules are in `docs/requirements.md` §4 and `docs/api.md` (collisions); the backend and sample data are being updated to match.
 
 ## What a card shows
 
 ```
 Nov 3 – Nov 6          3 assessments   18% avg per course
+Affects 28 of 42 students
 [CPSC 210 25%] [PHYS 118 10%] [MATH 200 20%]
-  CPSC 210  Midterm 2         Nov 3   25%
+  CPSC 210  Midterm 2         Nov 3   25%   ← this course
   PHYS 118  Circuits project  Nov 4   10%
   MATH 200  Midterm 2         Nov 6   20%
 Nearby stress peak: 8.8 on Nov 3
@@ -17,8 +18,9 @@ Nearby stress peak: 8.8 on Nov 3
 
 - **Date window and count:** when the pile-up happens and how many assessments land in it.
 - **Avg per course:** see below.
+- **Students affected:** how many of this class would feel this pile-up given their own courses, out of everyone enrolled (`students_affected` of `cohort_size`). Pile-ups affecting fewer than 5 students aren't shown, for privacy.
 - **Course chips:** each course's share of its own grade in this window.
-- **Deadline list:** every assessment in the window.
+- **Deadline list:** every assessment in the window. The rep's own course is highlighted, since those are the dates they can ask their instructor to move.
 - **Nearby stress peak:** the highest daily class average from 3 days before the window to its last day (`COLLISION_PEAK_LOOKBACK_DAYS` in `backend/app/config.py`). Ties go to the earliest day.
 
 ## Avg per course
@@ -42,7 +44,7 @@ Rules:
 - The average is rounded to a whole number.
 - Chips are listed in the order each course's first deadline is due.
 
-The average makes a pile-up spread across several courses look smaller (the demo's week 9 is 18% avg per course, versus 55% combined). The assessment count and the stress peak show how bad it is; the average shows how heavy each course's part is.
+The average makes a pile-up spread across several courses look smaller (the example above is 18% avg per course, versus 55% combined). The assessment count, the students affected and the stress peak show how bad it is; the average shows how heavy each course's part is.
 
 ## Stress peak messages
 
@@ -61,5 +63,15 @@ The average makes a pile-up spread across several courses look smaller (the demo
 | Card layout and messages | `frontend/src/components/CollisionCard.tsx` |
 | Per-course totals and average | `frontend/src/lib/weights.ts` (`weightByCourse`, `averageCourseWeight`) |
 | Tests | `frontend/src/test/rep-collisions.test.tsx` |
+| Which deadlines count, students affected | `backend/app/services/cohort.py` and `collisions.py` (`docs/architecture.md` §7) |
 
 The card is shared with the student heads-up card. The per-course view is turned on with the `byCourse` prop, which only the rep page passes, so the student card still shows the combined total.
+
+## Not built yet
+
+This page describes the agreed design. Still to do:
+
+- **Backend (#17):** shared courses, the own-course rule, `students_affected` and `cohort_size`.
+- **Sample data:** mirror the new rules in `frontend/src/mocks/` and match the seed's deadlines.
+- **Seed (`db/seed.py`):** add one week where a CPSC 210 deadline lands near other shared courses' deadlines, so the demo shows a cross-course pile-up.
+- **Card:** show "Affects X of Y students" and highlight the rep's own deadlines.
