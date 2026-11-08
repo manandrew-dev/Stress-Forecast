@@ -200,11 +200,24 @@ Rules: never send names, emails, or user ids to Gemini. The weekly report gets o
 
 `services/collisions.py` — pure functions, no DB access, so they can be tested with plain lists.
 
-1. Take all deadlines for the course (or the student's course combination for the heads-up).
-2. Slide a 5-day window across the term.
-3. Flag the window if it holds `>= COLLISION_MIN_COUNT` (3) assessments **or** combined weight `>= COLLISION_MIN_WEIGHT` (40%).
-4. Merge overlapping flagged windows.
-5. For each collision, attach the peak `avg_stress` in the window from 3 days before to its end (only non-suppressed days).
+The rule (both views):
+
+1. Slide a 5-day window across the term.
+2. Flag the window if it holds `>= COLLISION_MIN_COUNT` (3) assessments **or** combined weight `>= COLLISION_MIN_WEIGHT` (40%).
+3. Merge overlapping flagged windows.
+
+Which deadlines go in:
+
+- **Student heads-up:** the deadlines of the student's own courses.
+- **Rep view** (changed Nov 7): this course's deadlines plus those of its shared courses (other courses at least `COHORT_MIN` of its students also take). `services/cohort.py` looks up the shared courses and the enrollments; `collisions.py` stays pure.
+
+Then, for the rep view only:
+
+4. Keep windows that contain at least one of this course's own deadlines.
+5. `students_affected`: for each student in the course, run the rule on that window using only their own courses' deadlines; count the students it flags. Drop the window if the count is below `COHORT_MIN`.
+6. Attach the peak `avg_stress` of this course from 3 days before the window to its end (only non-suppressed days).
+
+Enrollments are read inside the API only; no per-student data leaves it, only the count.
 
 ## 8. Databricks
 

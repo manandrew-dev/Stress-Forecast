@@ -35,6 +35,15 @@ interface SimStudent {
   checkins: SimCheckin[];
 }
 
+/** Each fake student's course ids, in seed order (index 0 is the demo student). */
+export function studentCourseIds(demoStudentCourses: number[]): number[][] {
+  return Array.from({ length: STUDENT_COUNT }, (_, index) =>
+    index === 0
+      ? demoStudentCourses
+      : ENROLLMENT_PATTERNS[index % ENROLLMENT_PATTERNS.length]!.map((i) => COURSES[i]!.id),
+  );
+}
+
 /** Small deterministic PRNG (mulberry32), seeded like the Python fixture. */
 function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
@@ -64,10 +73,10 @@ function simulate(
   const uniform = (lo: number, hi: number) => lo + (hi - lo) * rng();
   const days = dayRange(TERM_START, addDays(MOCK_TODAY, -1));
   const students: SimStudent[] = [];
+  const enrolments = studentCourseIds(demoStudentCourses);
 
   for (let index = 0; index < count; index++) {
-    const pattern = ENROLLMENT_PATTERNS[index % ENROLLMENT_PATTERNS.length]!;
-    const courseIds = index === 0 ? demoStudentCourses : pattern.map((i) => COURSES[i]!.id);
+    const courseIds = enrolments[index]!;
     const mine = deadlines.filter((d) => courseIds.includes(d.course_id));
     const baseline = uniform(2.5, 4.1);
     const sensitivity = uniform(0.8, 1.2);

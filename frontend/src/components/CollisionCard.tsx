@@ -1,4 +1,4 @@
-import { Activity, CalendarRange } from "lucide-react";
+import { Activity, CalendarRange, Users } from "lucide-react";
 import type { ReactNode } from "react";
 
 import type { Course, Deadline } from "@/api/types";
@@ -19,6 +19,8 @@ export function CollisionCard({
   peak,
   today = new Date().toLocaleDateString("en-CA"),
   byCourse = false,
+  affected,
+  ownCourseId,
 }: {
   start: string;
   end: string;
@@ -35,6 +37,10 @@ export function CollisionCard({
    * total. Weights from different courses don't add up to anything meaningful.
    */
   byCourse?: boolean;
+  /** How many of the class this pile-up hits, out of everyone enrolled (rep view). */
+  affected?: { students: number; cohortSize: number };
+  /** The rep's own course: its deadlines are highlighted, since those are the ones they can ask to move. */
+  ownCourseId?: number;
 }) {
   return (
     <Card className="animate-rise overflow-hidden">
@@ -64,6 +70,13 @@ export function CollisionCard({
             </span>
           )}
         </div>
+        {affected && (
+          <p className="flex w-full items-center gap-1.5 text-sm">
+            <Users className="size-4 text-muted-foreground" />
+            Affects <strong className="font-semibold">{affected.students}</strong> of{" "}
+            {affected.cohortSize} students
+          </p>
+        )}
         {byCourse && (
           <ul
             className="flex w-full flex-wrap gap-2 text-sm"
@@ -83,7 +96,12 @@ export function CollisionCard({
       <div className="px-5 py-2">
         <ul className="divide-y">
           {deadlines.map((d) => (
-            <DeadlineRow key={d.id} deadline={d} course={courses.get(d.course_id)} />
+            <DeadlineRow
+              key={d.id}
+              deadline={d}
+              course={courses.get(d.course_id)}
+              own={ownCourseId !== undefined && d.course_id === ownCourseId}
+            />
           ))}
         </ul>
       </div>

@@ -100,6 +100,60 @@ export function repCollisions(
   });
 }
 
+/**
+ * Other courses at least `minStudents` of this course's students also take
+ * ("shared courses", docs/api.md collisions).
+ */
+export function sharedCourseIds(
+  courseId: number,
+  students: number[][],
+  minStudents: number,
+): number[] {
+  const counts = new Map<number, number>();
+  for (const courses of students) {
+    if (!courses.includes(courseId)) continue;
+    for (const c of courses) if (c !== courseId) counts.set(c, (counts.get(c) ?? 0) + 1);
+  }
+  return [...counts]
+    .filter(([, n]) => n >= minStudents)
+    .map(([c]) => c)
+    .sort((a, b) => a - b);
+}
+
+/**
+ * Rep collisions across the courses a class shares (docs/architecture.md §7, changed Nov 7):
+ * run the rule over this course's and its shared courses' deadlines, keep windows with at
+ * least one of this course's deadlines, count the students who'd see the window as a
+ * collision given their own courses, and drop windows under `minStudents`.
+ * Ahead of the backend until #17 implements it; repCollisions above stays at parity.
+ */
+export function crossCourseRepCollisions(
+  courseId: number,
+  deadlines: Deadline[],
+  students: number[][],
+  daily: DailyStress[],
+  minStudents: number,
+): (DetectedCollision & {
+  students_affected: number;
+  peak_avg_stress: number | null;
+  peak_date: string | null;
+})[] {
+  const cohort = students.filter((s) => s.includes(courseId));
+  const shared = sharedCourseIds(courseId, students, minStudents);
+  const pool = deadlines.filter((d) => d.course_id === courseId || shared.includes(d.course_id));
+  return repCollisions(pool, daily)
+    .filter((c) => c.deadlines.some((d) => d.course_id === courseId))
+    .map((c) => ({
+      ...c,
+      students_affected: cohort.filter((courses) =>
+        detectCollisions(pool.filter((d) => courses.includes(d.course_id))).some(
+          (w) => w.start <= c.end && w.end >= c.start,
+        ),
+      ).length,
+    }))
+    .filter((c) => c.students_affected >= minStudents);
+}
+
 /** Collisions overlapping the next HEADS_UP_DAYS days (today included), with a message. */
 export function headsUp(
   deadlines: Deadline[],
