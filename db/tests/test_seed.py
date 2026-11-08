@@ -13,6 +13,7 @@ from db import seed
 
 STUDENT = "auth0|fixture-student"
 REP = "auth0|fixture-rep"
+WEEK_9 = dt.date(2026, 11, 2)
 
 
 def test_term_courses_and_enrollments():
@@ -23,7 +24,8 @@ def test_term_courses_and_enrollments():
     assert len(seed.COURSES) == 4
     assert all(len(codes) >= 2 and set(codes) <= seed.COURSES.keys() for codes in enrollments.values())
     counts = Counter(code for codes in enrollments.values() for code in codes)
-    assert all(counts[code] >= seed.config.COHORT_MIN for code in seed.COURSES)
+    assert counts == {seed.FOCUS_COURSE: 25, seed.MATH_COURSE: 20, "DEMO PHYS 118": 25, "DEMO ENGL 110": 20}
+    assert sum(counts.values()) == 90
     assert all(item.course in seed.COURSES for item in seed.ASSESSMENTS)
 
 
@@ -31,6 +33,8 @@ def test_reproducible_checkins_with_variation_and_leadup():
     enrollments = seed.demo_enrollments(STUDENT)
     rows = seed.generate_checkins(enrollments)
     assert rows == seed.generate_checkins(enrollments)
+    assert len(rows) == 1992
+    assert sum(len(enrollments[row.user_id]) for row in rows) == 4479
     days = [(row.user_id, row.time.date()) for row in rows]
     assert len(days) == len(set(days))
     assert all(seed.TERM_START <= day < seed.DEMO_DAY for _, day in days)
@@ -47,21 +51,39 @@ def test_reproducible_checkins_with_variation_and_leadup():
         assert mean(stress) > quiet + 0.5
 
 
-def test_week_nine_collision_uses_real_detector():
+def test_week_nine_cross_course_fixture():
+    enrollments = seed.demo_enrollments(STUDENT)
+    cohort = [codes for codes in enrollments.values() if seed.FOCUS_COURSE in codes]
+    overlap = Counter(code for codes in cohort for code in codes if code != seed.FOCUS_COURSE)
+    shared = {code for code, size in overlap.items() if size >= seed.config.COHORT_MIN}
+    assert overlap == {seed.MATH_COURSE: 10, "DEMO PHYS 118": 15, "DEMO ENGL 110": 10}
+    course_ids = {code: index for index, code in enumerate(seed.COURSES, 1)}
+    focus_id = course_ids[seed.FOCUS_COURSE]
     deadlines = [
         Deadline(
-            id=index, course_id=1, title=item.title, due_date=item.due_date,
+            id=index, course_id=course_ids[item.course], title=item.title, due_date=item.due_date,
             weight_pct=item.weight, type=item.kind,
         )
-        for index, item in enumerate(seed.ASSESSMENTS, 1) if item.course == seed.FOCUS_COURSE
+        for index, item in enumerate(seed.ASSESSMENTS, 1) if item.course in shared | {seed.FOCUS_COURSE}
     ]
-    [collision] = find_collisions(deadlines)
+    [collision] = [window for window in find_collisions(deadlines)
+                   if WEEK_9 <= window.start < WEEK_9 + dt.timedelta(days=7)
+                   and any(item.course_id == focus_id for item in window.deadlines)]
     assert (collision.start, collision.end) == (dt.date(2026, 11, 3), dt.date(2026, 11, 7))
     first_monday = seed.TERM_START - dt.timedelta(days=seed.TERM_START.weekday())
     assert 1 + (collision.start - first_monday).days // 7 == 9
     assert collision.deadline_count == 3 and collision.total_weight_pct == 55
-    assert {item.title for item in collision.deadlines} == {"Midterm 2", "Project Phase 3", "Quiz 4"}
-    assert heads_up(deadlines, seed.DEMO_DAY)[0].total_weight_pct == 55
+    assert [(item.course_id, item.due_date.day, item.weight_pct) for item in collision.deadlines] == [
+        (focus_id, 3, 20), (course_ids[seed.MATH_COURSE], 5, 25), (focus_id, 7, 10),
+    ]
+    assert not find_collisions([item for item in collision.deadlines if item.course_id == focus_id])
+    affected = sum(bool(find_collisions([
+        item for item in collision.deadlines if item.course_id in {course_ids[code] for code in codes}
+    ])) for codes in cohort)
+    assert (affected, len(cohort)) == (10, 25)
+    assert affected >= seed.config.COHORT_MIN
+    student_ids = {course_ids[code] for code in enrollments[STUDENT]}
+    assert heads_up([item for item in deadlines if item.course_id in student_ids], seed.DEMO_DAY)[0].total_weight_pct == 55
 
 
 def test_explicit_demo_confirmation_is_required(capsys):
@@ -88,7 +110,7 @@ def test_missing_or_invalid_demo_ids_are_rejected(monkeypatch, capsys, student, 
     assert "distinct Auth0 demo user IDs" in capsys.readouterr().err
 
 
-def test_seed_database():
+def test_seed_database(monkeypatch):
     database_url = os.getenv("SEED_TEST_DATABASE_URL")
     if not database_url:
         pytest.skip("SEED_TEST_DATABASE_URL is required for the isolated TimescaleDB test")
@@ -105,6 +127,22 @@ def test_seed_database():
                         UNION ALL SELECT 1 FROM insights
                     )
                 """), "Use an empty, disposable database with the schema applied"
+
+                with pytest.raises(seed.SeedError, match="No existing demo fixture"):
+                    await seed.seed_demo(connection, STUDENT, REP, upgrade=True)
+                partial = connection.transaction()
+                await partial.start()
+                try:
+                    await connection.execute(
+                        "INSERT INTO courses (code, name, term) VALUES ($1, $2, $3)",
+                        seed.FOCUS_COURSE, seed.COURSES[seed.FOCUS_COURSE], seed.TERM,
+                    )
+                    with pytest.raises(seed.SeedError, match="Reserved demo course codes conflict"):
+                        await seed.seed_demo(connection, STUDENT, REP, upgrade=True)
+                    assert await connection.fetchval("SELECT count(*) FROM courses") == 1
+                    assert await connection.fetchval("SELECT count(*) FROM users") == 0
+                finally:
+                    await partial.rollback()
 
                 original_user = "auth0|unrelated-fixture"
                 stamp = dt.datetime(2026, 9, 8, 18, tzinfo=seed.VANCOUVER)
@@ -130,19 +168,97 @@ def test_seed_database():
                     await seed.seed_demo(connection, STUDENT, original_user)
                 assert await connection.fetchval("SELECT count(*) FROM users") == 1
 
-                async with pool.acquire() as second:
-                    results = await asyncio.gather(
-                        seed.seed_demo(connection, STUDENT, REP), seed.seed_demo(second, STUDENT, REP),
-                    )
+                with monkeypatch.context() as original:
+                    original.setattr(seed, "ASSESSMENTS", seed._ORIGINAL_ASSESSMENTS)
+                    async with pool.acquire() as second:
+                        results = await asyncio.gather(
+                            seed.seed_demo(connection, STUDENT, REP), seed.seed_demo(second, STUDENT, REP),
+                        )
                 assert results.count(None) == 1
                 seeded_checkins = next(count for count in results if count is not None)
-                assert seeded_checkins == len(seed.generate_checkins(seed.demo_enrollments(STUDENT)))
+                assert seeded_checkins == 1992
                 assert await seed.seed_demo(connection, "auth0|different-student", "auth0|different-rep") is None
+                focus_id = await connection.fetchval("SELECT id FROM courses WHERE code = $1", seed.FOCUS_COURSE)
+                math_id = await connection.fetchval("SELECT id FROM courses WHERE code = $1", seed.MATH_COURSE)
+                project_date_sql = "SELECT due_date FROM deadlines WHERE course_id = $1 AND title = 'Project Phase 3'"
+                assert await connection.fetchval(project_date_sql, focus_id) == dt.date(2026, 11, 5)
+                with pytest.raises(seed.SeedError, match="accounts, enrollments, or rep assignments"):
+                    await seed.seed_demo(connection, "auth0|different-student", REP, upgrade=True)
+
+                partial = connection.transaction()
+                await partial.start()
+                try:
+                    await connection.execute("""
+                        UPDATE deadlines SET due_date = DATE '2026-11-19'
+                        WHERE course_id = $1 AND title = 'Project Phase 3'
+                    """, focus_id)
+                    await connection.execute("""
+                        UPDATE deadlines SET due_date = DATE '2026-11-05'
+                        WHERE course_id = $1 AND title = 'Midterm 2'
+                    """, math_id)
+                    with pytest.raises(seed.SeedError, match="Demo check-ins differ"):
+                        await seed.seed_demo(connection, STUDENT, REP, upgrade=True)
+                finally:
+                    await partial.rollback()
+
+                enrollments = seed.demo_enrollments(STUDENT)
+                history = seed.generate_checkins(enrollments)
+                original_history = seed.generate_checkins(enrollments, seed._ORIGINAL_ASSESSMENTS)
+                old, new = next((a, b) for a, b in reversed(list(zip(original_history, history, strict=True))) if a != b)
+                update_text = "UPDATE checkins SET raw_text = $3 WHERE time = $1 AND user_id = $2"
+                await connection.execute(update_text, old.time, old.user_id, "Edited demo check-in")
+                with pytest.raises(seed.SeedError, match="Demo check-ins differ"):
+                    await seed.seed_demo(connection, STUDENT, REP, upgrade=True)
+                assert await connection.fetchval(project_date_sql, focus_id) == dt.date(2026, 11, 5)
+                assert await connection.fetchval(
+                    "SELECT raw_text FROM checkins WHERE time = $1 AND user_id = $2", old.time, old.user_id,
+                ) == "Edited demo check-in"
+                await connection.execute(update_text, old.time, old.user_id, old.raw_text)
+
+                authored = await connection.fetchval("""
+                    INSERT INTO deadlines (course_id, title, due_date, type, created_by)
+                    VALUES ($1, 'Student copy', DATE '2026-11-20', 'other', $2) RETURNING id
+                """, focus_id, STUDENT)
+                live_stamp = dt.datetime.combine(seed.DEMO_DAY, dt.time(12), seed.VANCOUVER)
+                await connection.execute("""
+                    INSERT INTO checkins (time, user_id, stress, raw_text) VALUES ($1, $2, 9, 'Live demo')
+                """, live_stamp, STUDENT)
+                await connection.executemany(
+                    "INSERT INTO checkin_course VALUES ($1, $2, $3, 9)",
+                    [(live_stamp, course_id, STUDENT) for course_id in (focus_id, math_id)],
+                )
+                await seed.refresh_demo_history(connection)
+                async with pool.acquire() as second:
+                    updates = await asyncio.gather(
+                        seed.seed_demo(connection, STUDENT, REP, upgrade=True),
+                        seed.seed_demo(second, STUDENT, REP, upgrade=True),
+                    )
+                assert updates.count(None) == 1 and 77 in updates
+                assert await seed.seed_demo(connection, STUDENT, REP, upgrade=True) is None
+                assert await connection.fetchval(project_date_sql, focus_id) == dt.date(2026, 11, 19)
+                assert await connection.fetchval(
+                    "SELECT due_date FROM deadlines WHERE course_id = $1 AND title = 'Midterm 2'", math_id,
+                ) == dt.date(2026, 11, 5)
+                assert await connection.fetchval("SELECT title FROM deadlines WHERE id = $1", authored) == "Student copy"
+                assert await connection.fetchval(
+                    "SELECT raw_text FROM checkins WHERE time = $1 AND user_id = $2", live_stamp, STUDENT,
+                ) == "Live demo"
+                assert await connection.fetchval("SELECT count(*) FROM checkin_course WHERE time = $1", live_stamp) == 2
+                stored = await connection.fetch("""
+                    SELECT time, user_id, stress, sleep_hours::float8, causes, raw_text FROM checkins
+                    WHERE user_id = ANY($1::text[]) AND time < $2
+                """, list(enrollments), live_stamp)
+                assert {
+                    seed.Checkin(time, user_id, stress, sleep, tuple(causes), text)
+                    for time, user_id, stress, sleep, causes, text in stored
+                } == set(history)
                 assert await connection.fetchval("SELECT count(*) FROM users WHERE role = 'student'") == 41
                 assert await connection.fetchval("SELECT count(*) FROM users WHERE role = 'rep'") == 1
                 assert await connection.fetchval("SELECT count(*) FROM courses") == 5
-                assert await connection.fetchval("SELECT count(*) FROM deadlines") == len(seed.ASSESSMENTS)
-                assert await connection.fetchval("SELECT count(*) FROM checkins") == seeded_checkins + 1
+                assert await connection.fetchval("SELECT count(*) FROM deadlines") == 19
+                assert await connection.fetchval("SELECT count(*) FROM checkins") == seeded_checkins + 2
+                assert await connection.fetchval("SELECT count(*) FROM checkin_course") == 4482
+                assert await connection.fetchval("SELECT count(*) FROM enrollments") == 91
                 assert await connection.fetchval("SELECT raw_text FROM checkins WHERE user_id = $1", original_user) == "Unrelated fixture"
                 assert await connection.fetchval("SELECT name FROM courses WHERE id = $1", unrelated) == "Other course"
                 assert await connection.fetchval("SELECT count(*) FROM enrollments WHERE user_id = $1", STUDENT) == 2
@@ -175,19 +291,38 @@ def test_seed_database():
                 assert {row["code"] for row in visible} == seed.COURSES.keys()
                 assert all(row["date"] != seed.LOW_RESPONSE_DAY for row in visible)
                 assert all("user_id" not in row.keys() and "raw_text" not in row.keys() for row in visible)
-                focus_id = await connection.fetchval("SELECT id FROM courses WHERE code = $1", seed.FOCUS_COURSE)
+                assert Counter(row["code"] for row in visible) == dict.fromkeys(seed.COURSES, 59)
                 assert 0 < await connection.fetchval("""
                     SELECT n_students FROM daily_course_stress
                     WHERE course_id = $1 AND (day AT TIME ZONE 'America/Vancouver')::date = $2
                 """, focus_id, seed.LOW_RESPONSE_DAY) < seed.config.COHORT_MIN
                 deadlines = await connection.fetch("""
-                    SELECT id, course_id, title, due_date, weight_pct, type FROM deadlines WHERE course_id = $1
-                """, focus_id)
-                [collision] = rep_collisions(
+                    SELECT id, course_id, title, due_date, weight_pct, type FROM deadlines
+                    WHERE course_id = ANY($1::int[]) AND created_by IS NULL
+                """, [focus_id, math_id])
+                collisions = rep_collisions(
                     [Deadline.model_validate(dict(row)) for row in deadlines],
                     [(row["date"], float(row["avg_stress"])) for row in visible if row["code"] == seed.FOCUS_COURSE],
                 )
+                [collision] = [item for item in collisions if item.start == dt.date(2026, 11, 3)]
                 assert collision.deadline_count == 3 and collision.total_weight_pct == 55
                 assert collision.peak_avg_stress > 5 and collision.peak_date is not None
+                assert {item.course_id for item in collision.deadlines} == {focus_id, math_id}
+                cohort = await connection.fetch("""
+                    SELECT array_agg(course_id) AS course_ids FROM enrollments
+                    WHERE user_id IN (SELECT user_id FROM enrollments WHERE course_id = $1)
+                    GROUP BY user_id
+                """, focus_id)
+                affected = sum(bool(find_collisions([
+                    item for item in collision.deadlines if item.course_id in row["course_ids"]
+                ])) for row in cohort)
+                assert (affected, len(cohort)) == (10, 25)
+                assert await connection.fetchval("""
+                    SELECT avg_stress = (
+                        SELECT avg(stress)::numeric(4, 2) FROM checkin_course
+                        WHERE course_id = $1 AND time >= $2 AND time < $3
+                    ) FROM daily_course_stress WHERE course_id = $1 AND day = $2
+                """, focus_id, dt.datetime(2026, 11, 4, tzinfo=seed.VANCOUVER),
+                    dt.datetime(2026, 11, 5, tzinfo=seed.VANCOUVER))
 
     asyncio.run(check())
