@@ -67,8 +67,12 @@ export function startAuth0(): void {
       const params = new URLSearchParams(window.location.search);
       let justLoggedIn = false;
       if (params.has("state") && (params.has("code") || params.has("error"))) {
-        await client.handleRedirectCallback();
-        window.history.replaceState(null, "", window.location.pathname);
+        try {
+          await client.handleRedirectCallback();
+        } finally {
+          // Drop ?code/?error/&state from the address bar, even when the login failed.
+          window.history.replaceState(null, "", window.location.pathname);
+        }
         justLoggedIn = true;
       }
 

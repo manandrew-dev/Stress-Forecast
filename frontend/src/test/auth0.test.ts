@@ -156,5 +156,6 @@ describe("startAuth0", () => {
     auth0.startAuth0();
     await settled(session);
     expect(session.getAuth0State().error).toMatch(/access_denied/);
+    expect(window.location.search).toBe("");
   });
 });
