@@ -15,13 +15,23 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useMe } from "./useMe";
 
 type Row = DeadlineDraft & { key: string };
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const weightOk = (w: number | null) => w === null || (Number.isFinite(w) && w >= 0 && w <= 100);
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 const STEPS = [
   "Reading your syllabus…",
@@ -40,13 +50,19 @@ function ParsingState() {
   // Eases toward 95% over ~15 seconds, never claiming to be done early.
   const pct = Math.min(95, 100 * (1 - Math.exp(-elapsed / 6)));
   return (
-    <Card className="flex flex-col items-center gap-5 px-6 py-12 text-center" role="status" aria-live="polite">
+    <Card
+      className="flex flex-col items-center gap-5 px-6 py-12 text-center"
+      role="status"
+      aria-live="polite"
+    >
       <div className="animate-breathe flex size-16 items-center justify-center rounded-full bg-primary-soft">
         <FileText className="size-7 text-primary" />
       </div>
       <div className="space-y-1">
         <p className="font-display text-xl font-semibold">{STEPS[step]}</p>
-        <p className="text-sm text-muted-foreground">This can take up to 15 seconds. Feel free to stretch.</p>
+        <p className="text-sm text-muted-foreground">
+          This can take up to 15 seconds. Feel free to stretch.
+        </p>
       </div>
       <Progress value={pct} className="h-2 w-full max-w-xs" />
     </Card>
@@ -75,14 +91,18 @@ function DeadlineEditor({
       </div>
       {rows.map((r, i) => {
         const titleBad = !r.title.trim();
-        const dateBad = !/^\d{4}-\d{2}-\d{2}$/.test(r.due_date);
+        const dateBad = !DATE_RE.test(r.due_date);
+        const weightBad = !weightOk(r.weight_pct);
         return (
           <div
             key={r.key}
             className="grid grid-cols-2 gap-3 rounded-2xl border bg-card p-3 shadow-soft md:grid-cols-[1fr_10rem_6rem_9rem_2.5rem] md:items-center md:rounded-xl md:border-transparent md:bg-transparent md:p-0 md:shadow-none"
           >
             <div className="col-span-2 md:col-span-1">
-              <Label htmlFor={`t-${r.key}`} className="mb-1 text-xs text-muted-foreground md:sr-only">
+              <Label
+                htmlFor={`t-${r.key}`}
+                className="mb-1 text-xs text-muted-foreground md:sr-only"
+              >
                 Title
               </Label>
               <Input
@@ -95,7 +115,10 @@ function DeadlineEditor({
               />
             </div>
             <div>
-              <Label htmlFor={`d-${r.key}`} className="mb-1 text-xs text-muted-foreground md:sr-only">
+              <Label
+                htmlFor={`d-${r.key}`}
+                className="mb-1 text-xs text-muted-foreground md:sr-only"
+              >
                 Due date
               </Label>
               <Input
@@ -108,7 +131,10 @@ function DeadlineEditor({
               />
             </div>
             <div>
-              <Label htmlFor={`w-${r.key}`} className="mb-1 text-xs text-muted-foreground md:sr-only">
+              <Label
+                htmlFor={`w-${r.key}`}
+                className="mb-1 text-xs text-muted-foreground md:sr-only"
+              >
                 Weight %
               </Label>
               <Input
@@ -120,15 +146,22 @@ function DeadlineEditor({
                 value={r.weight_pct ?? ""}
                 placeholder="—"
                 onChange={(e) =>
-                  update(r.key, { weight_pct: e.target.value === "" ? null : Number(e.target.value) })
+                  update(r.key, {
+                    weight_pct: e.target.value === "" ? null : Number(e.target.value),
+                  })
                 }
-                className="bg-card"
+                aria-invalid={weightBad}
+                title={weightBad ? "Weight must be between 0 and 100" : undefined}
+                className={cn("bg-card", weightBad && "border-destructive")}
               />
             </div>
             <div className="col-span-2 flex items-end gap-2 md:contents">
               <div className="flex-1">
                 <Label className="mb-1 text-xs text-muted-foreground md:sr-only">Type</Label>
-                <Select value={r.type} onValueChange={(v) => update(r.key, { type: v as DeadlineType })}>
+                <Select
+                  value={r.type}
+                  onValueChange={(v) => update(r.key, { type: v as DeadlineType })}
+                >
                   <SelectTrigger className="bg-card" aria-label="Type">
                     <SelectValue />
                   </SelectTrigger>
@@ -160,7 +193,13 @@ function DeadlineEditor({
         onClick={() =>
           setRows((rs) => [
             ...rs,
-            { key: crypto.randomUUID(), title: "", due_date: "", weight_pct: null, type: "assignment" },
+            {
+              key: crypto.randomUUID(),
+              title: "",
+              due_date: "",
+              weight_pct: null,
+              type: "assignment",
+            },
           ])
         }
       >
@@ -211,7 +250,7 @@ export function SyllabusPage() {
       setRowsState(null);
       setFile(null);
       setText("");
-      toast.success(`Saved ${res.deadlines.length} deadlines for ${course?.code}`);
+      toast.success(`Saved ${plural(res.deadlines.length, "deadline")} for ${course?.code}`);
     },
     onError: (e) => toast.error(errorMessage(e)),
   });
@@ -219,7 +258,7 @@ export function SyllabusPage() {
   const rowsValid =
     !!rows &&
     rows.length > 0 &&
-    rows.every((r) => r.title.trim() && /^\d{4}-\d{2}-\d{2}$/.test(r.due_date));
+    rows.every((r) => r.title.trim() && DATE_RE.test(r.due_date) && weightOk(r.weight_pct));
   const canParse = !!courseId && (mode === "file" ? !!file : text.trim().length > 0);
 
   if (me.isPending) return <Spinner />;
@@ -249,9 +288,12 @@ export function SyllabusPage() {
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-xl font-semibold">
-                {rows.length} deadlines found in {course?.code}
+                {plural(rows.length, "deadline")} found in {course?.code}
               </h2>
-              <p className="text-sm text-muted-foreground">Check each one, then save.</p>
+              <p className="text-sm text-muted-foreground">
+                Check each one, then save. Saving replaces any deadlines you saved for{" "}
+                {course?.code} before.
+              </p>
             </div>
           </div>
           <DeadlineEditor rows={rows} setRows={setRows} />
@@ -269,7 +311,7 @@ export function SyllabusPage() {
           {savedCount !== null && (
             <div className="flex items-center gap-2 rounded-xl bg-primary-soft px-4 py-3 text-sm">
               <CheckCircle2 className="size-4 text-primary" />
-              {savedCount} deadlines saved. Add another course's syllabus any time.
+              {plural(savedCount, "deadline")} saved. Add another course's syllabus any time.
             </div>
           )}
           <div className="space-y-2">
@@ -290,8 +332,12 @@ export function SyllabusPage() {
 
           <Tabs value={mode} onValueChange={(v) => setMode(v as "file" | "text")}>
             <TabsList className="grid w-full grid-cols-2 rounded-full">
-              <TabsTrigger value="file" className="rounded-full">Upload PDF</TabsTrigger>
-              <TabsTrigger value="text" className="rounded-full">Paste text</TabsTrigger>
+              <TabsTrigger value="file" className="rounded-full">
+                Upload PDF
+              </TabsTrigger>
+              <TabsTrigger value="text" className="rounded-full">
+                Paste text
+              </TabsTrigger>
             </TabsList>
             <TabsContent value="file" className="pt-3">
               <input
@@ -316,12 +362,16 @@ export function SyllabusPage() {
                 {file ? (
                   <>
                     <span className="font-medium">{file.name}</span>
-                    <span className="text-xs text-muted-foreground">Tap to choose a different file</span>
+                    <span className="text-xs text-muted-foreground">
+                      Tap to choose a different file
+                    </span>
                   </>
                 ) : (
                   <>
                     <span className="font-medium">Choose a PDF or drop it here</span>
-                    <span className="text-xs text-muted-foreground">Your course syllabus or outline</span>
+                    <span className="text-xs text-muted-foreground">
+                      Your course syllabus or outline
+                    </span>
                   </>
                 )}
               </button>
@@ -337,7 +387,12 @@ export function SyllabusPage() {
             </TabsContent>
           </Tabs>
 
-          <Button className="w-full sm:w-auto" size="lg" onClick={() => parse.mutate()} disabled={!canParse}>
+          <Button
+            className="w-full sm:w-auto"
+            size="lg"
+            onClick={() => parse.mutate()}
+            disabled={!canParse}
+          >
             Find deadlines
           </Button>
         </Card>
