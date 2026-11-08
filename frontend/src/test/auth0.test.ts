@@ -62,6 +62,12 @@ describe("roleFromAccessToken", () => {
     expect(auth0.roleFromAccessToken(fakeToken({ [ROLES_CLAIM]: ["admin"] }))).toBeNull();
     expect(auth0.roleFromAccessToken("not-a-jwt")).toBeNull();
   });
+
+  it("treats two roles as no role, like the API (which answers 403)", async () => {
+    const { auth0 } = await load();
+    expect(auth0.roleFromAccessToken(fakeToken({ [ROLES_CLAIM]: ["student", "rep"] }))).toBeNull();
+    expect(auth0.roleFromAccessToken(fakeToken({ [ROLES_CLAIM]: [] }))).toBeNull();
+  });
 });
 
 describe("startAuth0", () => {
