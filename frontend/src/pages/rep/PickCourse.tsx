@@ -1,6 +1,7 @@
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Inbox } from "lucide-react";
 
 import { PageHeader } from "@/components/PageHeader";
+import { EmptyState } from "@/components/StateViews";
 import { useRepCourse } from "./RepCourseContext";
 
 export function PickCourse() {
@@ -12,6 +13,11 @@ export function PickCourse() {
         title="Which class are you looking at?"
         description="You'll only ever see class-wide averages — never an individual student's check-ins."
       />
+      {courses.length === 0 && (
+        <EmptyState icon={Inbox} title="No courses assigned yet">
+          Your courses will show up here once you're assigned as their rep.
+        </EmptyState>
+      )}
       <ul className="grid gap-3 sm:grid-cols-2">
         {courses.map((c) => (
           <li key={c.id}>
