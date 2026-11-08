@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Lightbulb, Sprout } from "lucide-react";
+import { Database, Lightbulb, Sprout } from "lucide-react";
 
 import { api, qk } from "@/api/client";
 import { PageHeader } from "@/components/PageHeader";
@@ -10,15 +10,25 @@ import { WithCourse } from "./PickCourse";
 
 function Insights({ courseId }: { courseId: number }) {
   const courses = useCourseMap();
-  const q = useQuery({ queryKey: qk.insights(courseId), queryFn: () => api.getInsights(courseId) });
+  const q = useQuery({
+    queryKey: qk.insights(courseId),
+    queryFn: () => api.getInsights(courseId),
+    // Findings only change when the Databricks notebook runs, so the cached page is fresh enough.
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
 
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow={`${courses.get(courseId)?.code ?? ""} · Insights`}
         title="Patterns worth knowing"
-        description="Things we've noticed in this class's check-ins over the term."
+        description="Patterns in class-wide daily averages (days with 5+ students) and deadlines. Databricks never sees individual check-ins."
       />
+      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Database className="size-3.5" />
+        Found by our Databricks analysis of class-wide averages
+      </p>
       {q.isPending ? (
         <LoadingBlock rows={3} />
       ) : q.isError ? (
