@@ -93,7 +93,7 @@ def mocked(monkeypatch):
 
     calls = []
 
-    async def report(course, aggregates, deadlines, flagged, week_start):
+    async def report(course, aggregates, deadlines, flagged, week_start, course_codes=None):
         calls.append({"aggregates": aggregates, "flagged": flagged, "deadlines": deadlines})
         return gemini.WeeklyReport(summary="s", top_cause="overlapping deadlines", suggested_fix="f")
 
@@ -186,10 +186,23 @@ def test_collisions_report_insights(mocked):
     async def go():
         async with harness() as (client, _conn, focus):
             async with client("rep") as c:
-                cols = (await c.get(f"/api/courses/{focus}/collisions")).json()["collisions"]
-                # The current rep endpoint still uses only the focus course's deadlines.
-                # Week 9 needs MATH 200 to qualify under the merged cross-course design.
-                assert not any(x["start"] == "2026-11-03" for x in cols)
+                body = (await c.get(f"/api/courses/{focus}/collisions")).json()
+                codes = {r["id"]: r["code"] for r in await _conn.fetch("SELECT id, code FROM courses")}
+                # Cross-course pile-ups for DEMO CPSC 210 in the seed (db/README.md, week 9 fixture).
+                assert body["cohort_size"] == 25
+                got = [
+                    (x["start"], x["end"], x["total_weight_pct"], x["students_affected"],
+                     sorted({codes[d["course_id"]] for d in x["deadlines"]}))
+                    for x in body["collisions"]
+                ]
+                assert got == [
+                    ("2026-10-06", "2026-10-10", 40, 10, ["DEMO CPSC 210", "DEMO MATH 200"]),
+                    ("2026-11-03", "2026-11-07", 55, 10, ["DEMO CPSC 210", "DEMO MATH 200"]),
+                    ("2026-11-16", "2026-11-23", 70, 20, ["DEMO CPSC 210", "DEMO ENGL 110", "DEMO PHYS 118"]),
+                    ("2026-12-10", "2026-12-18", 95, 20, ["DEMO CPSC 210", "DEMO MATH 200", "DEMO PHYS 118"]),
+                ]
+                week9 = body["collisions"][1]
+                assert week9["peak_avg_stress"] is not None and "2026-10-31" <= week9["peak_date"] <= "2026-11-07"
 
                 rep_body = (await c.get(f"/api/courses/{focus}/report?week_start=2026-11-04")).json()
                 assert rep_body["week_start"] == "2026-11-02" and rep_body["top_cause"] == "overlapping deadlines"
@@ -274,6 +287,10 @@ def test_deadlines_dedupe_and_ownership():
                 deadlines = (await c.get(f"/api/courses/{focus}/cohort")).json()["deadlines"]
                 [midterm] = [d for d in deadlines if d["course_id"] == focus and d["due_date"] == "2026-11-03"]
                 assert (midterm["title"], midterm["weight_pct"]) == ("Midterm 2", 20)
+                # The student's saved "midterm 2 " copy must not double-count in week 9.
+                cols = (await c.get(f"/api/courses/{focus}/collisions")).json()["collisions"]
+                [week9] = [x for x in cols if x["start"] == "2026-11-03"]
+                assert (week9["deadline_count"], week9["total_weight_pct"]) == (3, 55)
 
     run(go())
 
