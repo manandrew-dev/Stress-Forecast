@@ -6,6 +6,8 @@ import { addDays } from "@/lib/dates";
 
 export const COLLISION_MIN_COUNT = 3;
 export const COLLISION_MIN_WEIGHT = 40;
+/** The weight rule needs at least this many assessments: one heavy exam alone isn't a pile-up. */
+export const COLLISION_WEIGHT_MIN_COUNT = 2;
 export const COLLISION_WINDOW_DAYS = 5;
 export const COLLISION_PEAK_LOOKBACK_DAYS = 3;
 export const HEADS_UP_DAYS = 14;
@@ -30,7 +32,11 @@ function knownWeight(deadlines: Deadline[]): number {
 }
 
 function isCollision(deadlines: Deadline[]): boolean {
-  return deadlines.length >= COLLISION_MIN_COUNT || knownWeight(deadlines) >= COLLISION_MIN_WEIGHT;
+  return (
+    deadlines.length >= COLLISION_MIN_COUNT ||
+    (deadlines.length >= COLLISION_WEIGHT_MIN_COUNT &&
+      knownWeight(deadlines) >= COLLISION_MIN_WEIGHT)
+  );
 }
 
 /**
@@ -38,7 +44,8 @@ function isCollision(deadlines: Deadline[]): boolean {
  * rep view, or every deadline across a student's courses for the heads-up.
  *
  * A collision is a COLLISION_WINDOW_DAYS-day window holding at least COLLISION_MIN_COUNT
- * assessments OR assessments worth at least COLLISION_MIN_WEIGHT percent combined.
+ * assessments, OR at least COLLISION_WEIGHT_MIN_COUNT assessments worth at least
+ * COLLISION_MIN_WEIGHT percent combined (one heavy assessment alone is not a pile-up).
  */
 export function detectCollisions(deadlines: Deadline[]): DetectedCollision[] {
   const ordered = [...deadlines].sort(
@@ -158,15 +165,24 @@ export function crossCourseRepCollisions(
 export function headsUp(
   deadlines: Deadline[],
   today: string,
+  courseCodes?: Map<number, string>,
 ): (DetectedCollision & { message: string })[] {
   const horizonEnd = addDays(today, HEADS_UP_DAYS - 1);
   return detectCollisions(deadlines)
     .filter((c) => c.end >= today && c.start <= horizonEnd)
-    .map((c) => ({ ...c, message: headsUpMessage(c) }));
+    .map((c) => ({ ...c, message: headsUpMessage(c, today, courseCodes) }));
 }
 
-/** Same wording as the backend template. The frontend shows `message` as a plain string. */
-export function headsUpMessage(c: DetectedCollision): string {
+/**
+ * Same wording as the backend template: a summary plus a nudge to start the heaviest
+ * deadline still ahead (due on or after `today`), named with its course code when known.
+ * The nudge is left out when nothing in the window is still ahead.
+ */
+export function headsUpMessage(
+  c: DetectedCollision,
+  today?: string,
+  courseCodes?: Map<number, string>,
+): string {
   const days =
     Math.round(
       (Date.parse(`${c.end}T00:00:00Z`) - Date.parse(`${c.start}T00:00:00Z`)) / 86_400_000,
@@ -182,11 +198,14 @@ export function headsUpMessage(c: DetectedCollision): string {
         ? `${c.deadline_count} ${noun} worth at least ${weight} in ${days} days.`
         : `${c.deadline_count} ${noun} worth ${weight} in ${days} days.`;
 
-  // Heaviest item; ties go to the earliest due date.
-  const heaviest = c.deadlines.reduce((best, d) => {
+  const upcoming = c.deadlines.filter((d) => today === undefined || d.due_date >= today);
+  if (upcoming.length === 0) return summary;
+  // Heaviest still-upcoming item; ties go to the earliest due date.
+  const heaviest = upcoming.reduce((best, d) => {
     const bw = best.weight_pct ?? 0;
     const dw = d.weight_pct ?? 0;
     return dw > bw || (dw === bw && d.due_date < best.due_date) ? d : best;
   });
-  return `${summary} Start ${heaviest.title} early.`;
+  const code = courseCodes?.get(heaviest.course_id);
+  return `${summary} Start ${code ? `${code} ${heaviest.title}` : heaviest.title} early.`;
 }

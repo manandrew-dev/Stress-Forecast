@@ -3,7 +3,13 @@
 import { describe, expect, it } from "vitest";
 
 import type { Deadline } from "@/api/types";
-import { detectCollisions, headsUp, headsUpMessage, repCollisions } from "@/mocks/collisions";
+import {
+  crossCourseRepCollisions,
+  detectCollisions,
+  headsUp,
+  headsUpMessage,
+  repCollisions,
+} from "@/mocks/collisions";
 
 let nextId = 1;
 function d(day: string, weight: number | null = 10, title?: string, course_id = 1): Deadline {
@@ -181,5 +187,79 @@ describe("headsUp (backend parity)", () => {
       detectCollisions([d("2026-11-09", null, "A"), d("2026-11-10", null), d("2026-11-11", null)]),
     );
     expect(headsUpMessage(c)).toBe("3 assessments in 5 days. Start A early.");
+  });
+});
+
+describe("heads-up nudge (backend parity)", () => {
+  const week9 = () => [
+    d("2026-11-03", 20, "Midterm 2", 1),
+    d("2026-11-05", 25, "Midterm 2", 2),
+    d("2026-11-07", 10, "Quiz 4", 1),
+  ];
+  const codes = new Map([
+    [1, "CPSC 210"],
+    [2, "MATH 200"],
+  ]);
+
+  it("skips deadlines already past", () => {
+    const c = only(detectCollisions(week9()));
+    expect(headsUpMessage(c, "2026-11-07", codes)).toBe(
+      "3 assessments worth 55% in 5 days. Start CPSC 210 Quiz 4 early.",
+    );
+  });
+
+  it("includes deadlines due today", () => {
+    const c = only(detectCollisions(week9()));
+    expect(headsUpMessage(c, "2026-11-05", codes).endsWith("Start MATH 200 Midterm 2 early.")).toBe(
+      true,
+    );
+  });
+
+  it("leaves the nudge out when everything is past", () => {
+    const c = only(detectCollisions(week9()));
+    expect(headsUpMessage(c, "2026-11-08", codes)).toBe("3 assessments worth 55% in 5 days.");
+  });
+
+  it("falls back to the title without course codes", () => {
+    const c = only(detectCollisions(week9()));
+    expect(headsUpMessage(c, "2026-11-07").endsWith("Start Quiz 4 early.")).toBe(true);
+  });
+
+  it("headsUp passes today and codes", () => {
+    const c = only(headsUp(week9(), "2026-11-07", codes));
+    expect(c.message.endsWith("Start CPSC 210 Quiz 4 early.")).toBe(true);
+  });
+});
+
+describe("weight rule needs a pile-up (backend parity)", () => {
+  it("a single heavy final is not a collision", () => {
+    expect(detectCollisions([d("2026-12-14", 50, "Final Exam")])).toEqual([]);
+    expect(detectCollisions([d("2026-12-14", 100, "Final Exam")])).toEqual([]);
+  });
+
+  it("two assessments reaching the weight threshold still collide", () => {
+    const c = only(detectCollisions([d("2026-12-10", 20), d("2026-12-12", 20)]));
+    expect([c.deadline_count, c.total_weight_pct]).toEqual([2, 40]);
+  });
+
+  it("a lone heavy final no longer stretches a window", () => {
+    const finals = [
+      d("2026-12-10", 20, undefined, 1),
+      d("2026-12-12", 35, undefined, 3),
+      d("2026-12-14", 40, undefined, 2),
+    ];
+    const c = only(detectCollisions(finals));
+    expect([c.start, c.end]).toEqual(["2026-12-10", "2026-12-16"]);
+  });
+
+  it("a lone heavy assessment gives no heads-up", () => {
+    expect(headsUp([d("2026-11-10", 45, "Research Essay")], "2026-11-07")).toEqual([]);
+  });
+
+  it("a lone heavy assessment is not a rep pile-up", () => {
+    const students = Array.from({ length: 20 }, () => [1]);
+    expect(
+      crossCourseRepCollisions(1, [d("2026-12-04", 40, "Research Essay", 1)], students, [], 5),
+    ).toEqual([]);
   });
 });
