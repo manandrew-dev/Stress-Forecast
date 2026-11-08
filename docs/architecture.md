@@ -190,11 +190,13 @@ All calls live in `backend/app/services/gemini.py`. Each function uses **structu
 
 | Function | Input | Output (validated) |
 | --- | --- | --- |
-| `extract_deadlines(syllabus_text)` | Syllabus text (PDF text extracted server-side first) | `[{title, due_date (YYYY-MM-DD), weight_pct \| null, type}]` |
+| `extract_deadlines(syllabus_text, today=None)` | Syllabus text (PDF text extracted server-side first); `today` only helps infer missing years | `[{title, due_date (YYYY-MM-DD), weight_pct \| null, type}]` |
 | `parse_checkin(text)` | Check-in text | `{stress 1–10, sleep_hours \| null, causes: string[], concerning: bool}` |
-| `weekly_report(course, aggregates, deadlines, collisions)` | **Aggregates only**, never raw text | `{summary, top_cause, suggested_fix}` |
+| `weekly_report(course, aggregates, deadlines, collisions, week_start, course_codes=None)` | **Aggregates only**, never raw text: the report week and the week before as `(date, avg_stress)`, this course's and shared courses' deadlines, cross-course collisions | `{summary, top_cause, suggested_fix}` |
 
-Rules: never send names, emails, or user ids to Gemini. The weekly report gets only suppressed-safe aggregates.
+All three are `async` and raise `AIParseError` after the retry; the API maps it to `422 ai_parse_failed`.
+
+Rules: never send names, emails, or user ids to Gemini. The weekly report gets only suppressed-safe aggregates. Each deadline in its payload carries its course code and an `own_course` flag, and `suggested_fix` must move one of the course's **own** deadlines (the rep can only ask their own instructor). No student or enrollment data is sent; `students_affected` stays out of the payload.
 
 ## 7. Collision detection
 

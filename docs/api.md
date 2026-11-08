@@ -153,20 +153,28 @@ If `concerning` is `true`, the frontend must show the support-resources message 
 ### `GET /me/heads-up`
 **Role:** student. Collisions in the next 14 days for the student's own course combination.
 
+`message` is a fixed template (no Gemini call), shown as a plain string: a summary of the window, then a nudge to start the heaviest deadline that is **still upcoming** (due today or later), named with its course code. Ties go to the earliest due date. If every deadline in the window is already past, the nudge is left out. If any weight is unknown, the summary says "worth at least X%".
+
 ```json
 {
   "collisions": [
     {
-      "start": "2026-11-09",
-      "end": "2026-11-13",
+      "start": "2026-11-03",
+      "end": "2026-11-07",
       "deadline_count": 3,
       "total_weight_pct": 55,
-      "deadlines": [ { "id": 12, "course_id": 1, "title": "Midterm 2", "due_date": "2026-11-10", "weight_pct": 25, "type": "midterm" } ],
-      "message": "3 assessments worth 55% in 5 days. Start Project Phase 3 this weekend."
+      "deadlines": [
+        { "id": 3, "course_id": 1, "title": "Midterm 2", "due_date": "2026-11-03", "weight_pct": 20, "type": "midterm" },
+        { "id": 9, "course_id": 2, "title": "Midterm 2", "due_date": "2026-11-05", "weight_pct": 25, "type": "midterm" },
+        { "id": 4, "course_id": 1, "title": "Quiz 4", "due_date": "2026-11-07", "weight_pct": 10, "type": "quiz" }
+      ],
+      "message": "3 assessments worth 55% in 5 days. Start CPSC 210 Quiz 4 early."
     }
   ]
 }
 ```
+
+(Example for Nov 7: both midterms are past, so the nudge names Quiz 4.)
 
 ---
 
