@@ -6,7 +6,7 @@ import { DeadlineRow } from "@/components/DeadlineRow";
 import { StressDot } from "@/components/StressMeter";
 import { Card } from "@/components/ui/card";
 import { rangeLabel, shortDate } from "@/lib/dates";
-import { weightByCourse } from "@/lib/weights";
+import { averageCourseWeight, weightByCourse } from "@/lib/weights";
 
 export function CollisionCard({
   start,
@@ -31,8 +31,8 @@ export function CollisionCard({
   /** Local "YYYY-MM-DD"; a pile-up starting after it has no check-ins yet. */
   today?: string;
   /**
-   * Show each course's share of its own grade instead of one combined total.
-   * Weights from different courses don't add up to anything meaningful.
+   * Show each course's share and the average per course instead of one combined
+   * total. Weights from different courses don't add up to anything meaningful.
    */
   byCourse?: boolean;
 }) {
@@ -48,7 +48,16 @@ export function CollisionCard({
             <strong className="font-semibold">{deadlineCount}</strong>{" "}
             <span className="text-muted-foreground">assessments</span>
           </span>
-          {!byCourse && (
+          {byCourse ? (
+            <span>
+              <strong className="font-semibold">
+                {averageCourseWeight(deadlines) === null
+                  ? "—"
+                  : `${averageCourseWeight(deadlines)}%`}
+              </strong>{" "}
+              <span className="text-muted-foreground">avg per course</span>
+            </span>
+          ) : (
             <span>
               <strong className="font-semibold">{totalWeight}%</strong>{" "}
               <span className="text-muted-foreground">combined</span>

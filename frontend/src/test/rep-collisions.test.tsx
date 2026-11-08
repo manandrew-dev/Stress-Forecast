@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { api } from "@/api/client";
 import type { CollisionsResponse, Course, Deadline } from "@/api/types";
-import { weightByCourse } from "@/lib/weights";
+import { averageCourseWeight, weightByCourse } from "@/lib/weights";
 import { CollisionsPage } from "@/pages/rep/CollisionsPage";
 import { RepCourseProvider } from "@/pages/rep/RepCourseContext";
 
@@ -129,6 +129,11 @@ describe("rep collision flags", () => {
     );
     expect(items).toEqual([["CPSC 210 45%", "MATH 200 10%"], ["CPSC 210 45%"]]);
     expect(screen.queryByText("combined")).not.toBeInTheDocument();
+    // Nov: CPSC 45%, MATH 10% → 28% (27.5 rounded); Oct: CPSC 45% only → 45%
+    const averages = screen
+      .getAllByText("avg per course")
+      .map((el) => el.parentElement?.textContent);
+    expect(averages).toEqual(["28% avg per course", "45% avg per course"]);
   });
 
   it("says Not enough responses when a collision has no nearby stress peak", async () => {
@@ -207,5 +212,26 @@ describe("weightByCourse", () => {
       { courseId: 1, weight: 10 },
       { courseId: 3, weight: null },
     ]);
+  });
+});
+
+describe("averageCourseWeight", () => {
+  const d = (id: number, course_id: number, weight_pct: number | null): Deadline => ({
+    id,
+    course_id,
+    title: `D${id}`,
+    due_date: "2026-11-10",
+    weight_pct,
+    type: "other",
+  });
+
+  it("totals each course, then averages across courses", () => {
+    // ENGL 10% + 20% = 30%, PHYS 50% → (30 + 50) / 2 = 40%
+    expect(averageCourseWeight([d(1, 4, 10), d(2, 4, 20), d(3, 3, 50)])).toBe(40);
+  });
+
+  it("leaves out courses with no weights, and returns null when none have any", () => {
+    expect(averageCourseWeight([d(1, 4, 30), d(2, 3, null)])).toBe(30);
+    expect(averageCourseWeight([d(1, 4, null)])).toBeNull();
   });
 });
