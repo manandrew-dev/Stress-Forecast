@@ -22,14 +22,14 @@ import { WithCourse } from "./PickCourse";
 /** What the API puts in top_cause when a week has too few check-ins for a report. */
 const NOT_ENOUGH_DATA = "not enough data";
 
-/** Errors that will fail the same way if we ask again; each retry costs a Gemini call. */
-const NO_RETRY_STATUSES = new Set([404, 422, 429, 503]);
-
+/**
+ * Each report request can cost a Gemini call, and the API answers every server-side
+ * failure (including Gemini quota and overload) with the same 500, so retrying those
+ * just spends quota. Only a network error, where the request may never have arrived,
+ * is retried, and only once. "Try again" is always there for the rep.
+ */
 function shouldRetryReport(failureCount: number, error: unknown): boolean {
-  if (error instanceof ApiError) {
-    if (error.code === "ai_parse_failed" || NO_RETRY_STATUSES.has(error.status)) return false;
-  }
-  return failureCount < 2;
+  return error instanceof ApiError && error.code === "network_error" && failureCount < 1;
 }
 
 function Report({ courseId }: { courseId: number }) {
@@ -60,6 +60,7 @@ function Report({ courseId }: { courseId: number }) {
     enabled: !!week,
     // Gemini's free quota is small: a week's report is fetched once and reused.
     staleTime: Infinity,
+    gcTime: Infinity,
     refetchOnWindowFocus: false,
     retry: shouldRetryReport,
   });
@@ -125,15 +126,9 @@ function Report({ courseId }: { courseId: number }) {
           {report.isPending ? (
             <LoadingBlock rows={2} />
           ) : report.isError ? (
-            report.error instanceof ApiError && report.error.status === 404 ? (
-              <EmptyState icon={FileBarChart} title="No report yet">
-                {report.error.message}
-              </EmptyState>
-            ) : (
-              <ErrorState error={report.error} onRetry={() => report.refetch()} />
-            )
+            <ErrorState error={report.error} onRetry={() => report.refetch()} />
           ) : report.data.top_cause === NOT_ENOUGH_DATA ? (
-            // The real API answers 200 with this marker instead of a 404 (docs/api.md).
+            // A week without enough check-ins comes back as a normal answer (docs/api.md).
             <EmptyState icon={FileBarChart} title="No report yet">
               {report.data.summary || "There aren't enough check-ins for this week yet."}
             </EmptyState>

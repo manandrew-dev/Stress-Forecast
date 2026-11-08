@@ -1,5 +1,5 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { focusManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { api } from "@/api/client";
@@ -105,21 +105,6 @@ describe("rep weekly report", () => {
     expect(getReport).toHaveBeenCalledTimes(1);
   });
 
-  it("shows No report yet when the mock API answers 404", async () => {
-    const getReport = vi
-      .spyOn(api, "getReport")
-      .mockRejectedValue(
-        new ApiError("not_found", "There aren't enough check-ins for this week yet.", 404),
-      );
-    renderPage();
-
-    expect(await screen.findByText("No report yet")).toBeInTheDocument();
-    expect(
-      screen.getByText("There aren't enough check-ins for this week yet."),
-    ).toBeInTheDocument();
-    expect(getReport).toHaveBeenCalledTimes(1);
-  });
-
   it("shows No report yet when the real API says there is not enough data", async () => {
     vi.spyOn(api, "getReport").mockResolvedValue({
       week_start: "2026-11-02",
@@ -148,18 +133,88 @@ describe("rep weekly report", () => {
     expect(getReport).not.toHaveBeenCalled();
   });
 
-  it.each([
-    ["ai_parse_failed", 422, "Gemini returned an unusable report."],
-    ["rate_limited", 429, "The free Gemini quota is used up for now."],
-    ["service_unavailable", 503, "The report service is taking a break."],
-  ])("does not retry a %s error", async (code, status, message) => {
+  it("doesn't retry a server error, since each try can cost a Gemini call", async () => {
+    // The API answers Gemini quota and overload errors with a plain 500 (backend/app/errors.py).
     const getReport = vi
       .spyOn(api, "getReport")
-      .mockRejectedValue(new ApiError(code, message, status));
+      .mockRejectedValue(new ApiError("internal", "Internal Server Error", 500));
+    renderPage(new QueryClient());
+
+    expect(await screen.findByText("Internal Server Error")).toBeInTheDocument();
+    expect(getReport).toHaveBeenCalledTimes(1);
+  });
+
+  it("doesn't retry a Gemini parse failure", async () => {
+    const getReport = vi
+      .spyOn(api, "getReport")
+      .mockRejectedValue(new ApiError("ai_parse_failed", "Gemini returned unusable output.", 422));
+    renderPage(new QueryClient());
+
+    expect(await screen.findByText("Gemini returned unusable output.")).toBeInTheDocument();
+    expect(getReport).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows Course not found as an error, not as an empty report", async () => {
+    vi.spyOn(api, "getReport").mockRejectedValue(
+      new ApiError("not_found", "Course not found", 404),
+    );
     renderPage();
 
-    expect(await screen.findByText(message)).toBeInTheDocument();
+    expect(await screen.findByText("Course not found")).toBeInTheDocument();
+    expect(screen.queryByText("No report yet")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+  });
+
+  it("retries a network error once, then shows it", async () => {
+    const getReport = vi
+      .spyOn(api, "getReport")
+      .mockRejectedValue(new ApiError("network_error", "Can't reach the server.", 0));
+    renderPage(new QueryClient({ defaultOptions: { queries: { retryDelay: 0 } } }));
+
+    expect(await screen.findByText("Can't reach the server.")).toBeInTheDocument();
+    expect(getReport).toHaveBeenCalledTimes(2);
+  });
+
+  it("loads the report when the rep clicks Try again", async () => {
+    const getReport = vi
+      .spyOn(api, "getReport")
+      .mockRejectedValueOnce(new ApiError("internal", "Internal Server Error", 500))
+      .mockResolvedValue(REPORT);
+    renderPage(new QueryClient());
+
+    fireEvent.click(await screen.findByRole("button", { name: "Try again" }));
+    expect(await screen.findByText(REPORT.summary)).toBeInTheDocument();
+    expect(getReport).toHaveBeenCalledTimes(2);
+  });
+
+  it("doesn't refetch when the browser tab regains focus", async () => {
+    const getReport = vi.spyOn(api, "getReport").mockResolvedValue(REPORT);
+    renderPage();
+    expect(await screen.findByText(REPORT.summary)).toBeInTheDocument();
+
+    act(() => {
+      focusManager.setFocused(false);
+      focusManager.setFocused(true);
+    });
+    await new Promise((r) => setTimeout(r, 20));
     expect(getReport).toHaveBeenCalledTimes(1);
+    focusManager.setFocused(undefined);
+  });
+
+  it("loads the previous week with the arrow, and reuses the first week on the way back", async () => {
+    const getReport = vi.spyOn(api, "getReport").mockImplementation(async (_course, week) => ({
+      ...REPORT,
+      week_start: week!,
+      summary: `Report for ${week}`,
+    }));
+    renderPage();
+
+    expect(await screen.findByText("Report for 2026-11-02")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Previous week" }));
+    expect(await screen.findByText("Report for 2026-10-26")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Next week" }));
+    expect(await screen.findByText("Report for 2026-11-02")).toBeInTheDocument();
+
+    expect(getReport.mock.calls.map((c) => c[1])).toEqual(["2026-11-02", "2026-10-26"]);
   });
 });

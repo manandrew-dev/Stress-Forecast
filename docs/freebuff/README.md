@@ -4,7 +4,7 @@ Everyone's Freebuff screenshots go in this folder. Khan builds the "Best Project
 
 ## How to add yours
 
-1. **Take screenshots while Freebuff works** (Mac: Cmd + Shift + 4, then drag). Good moments: it reading the code, its plan, its edits, and the passing tests. Expand collapsed output ("Show more lines") first so the results are visible.
+1. **Take screenshots while Freebuff works** (Mac: Cmd + Shift + 4, then drag; Windows: Win + Shift + S). Good moments: it reading the code, its plan, its edits, and the passing tests. Expand collapsed output ("Show more lines") first so the results are visible.
 2. **Name them** `<issue>-<short-name>-<step>-<what>.png`, for example `16-checkin-endpoint-2-plans-route.png`. Numbering the steps keeps them in order.
 3. **Put them in this folder** (`docs/freebuff/`), not in a subfolder.
 4. **Add a section below** with a heading `## #<issue> <title> (<your name>, <date>)` and one line per screenshot saying what Freebuff did in it.

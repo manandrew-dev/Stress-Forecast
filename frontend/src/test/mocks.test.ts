@@ -182,12 +182,18 @@ describe("error codes (mock)", () => {
       () => mock.getCohort(student, 1),
       () => mock.getCohort(rep, 3),
       () => mock.getCohort(rep, 999),
-      () => mock.getReport(rep, 1, "2025-01-06"),
     ];
     for (const start of failures) {
       const err = await run(start()).catch((e: unknown) => e);
       expect(DOCUMENTED_CODES).toContain((err as { code?: string }).code);
     }
+  });
+});
+
+describe("GET /report (mock)", () => {
+  it("answers a week without check-ins like the real API", async () => {
+    const report = await run(mock.getReport(rep, 1, "2025-01-06"));
+    expect(report).toMatchObject({ week_start: "2025-01-06", top_cause: "not enough data" });
   });
 });
 
