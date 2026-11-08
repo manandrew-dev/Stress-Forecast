@@ -110,7 +110,7 @@ describe("PUT / DELETE /deadlines/{id} (mock)", () => {
   });
 
   it("forbids changing someone else's deadline", async () => {
-    await expect(run(mock.deleteDeadline(student, 101))).rejects.toMatchObject({
+    await expect(run(mock.deleteDeadline(student, 1))).rejects.toMatchObject({
       code: "forbidden",
       status: 403,
     });
@@ -126,7 +126,7 @@ describe("PUT / DELETE /deadlines/{id} (mock)", () => {
   });
 
   it("is student-only", async () => {
-    await expect(run(mock.deleteDeadline(rep, 101))).rejects.toMatchObject({
+    await expect(run(mock.deleteDeadline(rep, 1))).rejects.toMatchObject({
       code: "forbidden",
       status: 403,
     });
@@ -148,6 +148,7 @@ describe("query params (mock)", () => {
   });
 
   it("filters the cohort by from/to", async () => {
+    // The seed has no check-ins on the demo day itself, so the series ends the day before.
     const res = await run(mock.getCohort(rep, 1, { from: "2026-11-01", to: "2026-11-07" }));
     expect(res.days.map((d) => d.date)).toEqual([
       "2026-11-01",
@@ -156,7 +157,6 @@ describe("query params (mock)", () => {
       "2026-11-04",
       "2026-11-05",
       "2026-11-06",
-      "2026-11-07",
     ]);
   });
 
@@ -188,5 +188,30 @@ describe("error codes (mock)", () => {
       const err = await run(start()).catch((e: unknown) => e);
       expect(DOCUMENTED_CODES).toContain((err as { code?: string }).code);
     }
+  });
+});
+
+describe("mock data mirrors db/seed.py", () => {
+  it("shows the rep a week 9 pile-up inside DEMO CPSC 210 alone", async () => {
+    const { collisions } = await run(mock.getCollisions(rep, 1));
+    const week9 = collisions.find((c) => c.start >= "2026-11-02" && c.start <= "2026-11-08");
+    expect(week9).toMatchObject({ deadline_count: 3, total_weight_pct: 55 });
+    expect(week9!.deadlines.map((d) => d.title)).toEqual([
+      "Midterm 2",
+      "Project Phase 3",
+      "Quiz 4",
+    ]);
+    expect(week9!.peak_avg_stress).not.toBeNull();
+  });
+
+  it("only hides the seed's low-response day", async () => {
+    const { days } = await run(mock.getCohort(rep, 1));
+    expect(days.filter((d) => d.suppressed).map((d) => d.date)).toEqual(["2026-09-13"]);
+    expect(days.every((d) => d.suppressed || (d.n_students ?? 0) >= 5)).toBe(true);
+  });
+
+  it("starts the demo student enrolled in DEMO CPSC 210 and DEMO MATH 200", async () => {
+    const me = await run(mock.getMe(student));
+    expect(me.courses.map((c) => c.code)).toEqual(["DEMO CPSC 210", "DEMO MATH 200"]);
   });
 });
