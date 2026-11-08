@@ -21,7 +21,7 @@ import type {
 import type { AuthUser } from "@/auth/session";
 import { addDays, diffDays, longDate, rangeLabel, shortDate, weekStartOf } from "@/lib/dates";
 import { analyzeCheckin } from "./checkin";
-import { detectCollisions, type DetectedCollision } from "./collisions";
+import { detectCollisions, headsUp, repCollisions } from "./collisions";
 import {
   BASE_DEADLINES,
   COURSES,
@@ -65,6 +65,11 @@ function allDeadlines(): Deadline[] {
 function enrolledDeadlines(): Deadline[] {
   const ids = getState().enrolledCourseIds;
   return allDeadlines().filter((d) => ids.includes(d.course_id));
+}
+
+/** One course's deadlines: what the backend uses for every rep endpoint (architecture.md §7). */
+function courseDeadlines(courseId: number): Deadline[] {
+  return allDeadlines().filter((d) => d.course_id === courseId);
 }
 
 function courseCode(id: number) {
@@ -239,27 +244,10 @@ export async function getMyTrend(
   };
 }
 
-function headsUpMessage(c: DetectedCollision): string {
-  const days = diffDays(c.end, c.start) + 1;
-  const first = c.deadlines[0]!;
-  const startsIn = diffDays(c.start, MOCK_TODAY);
-  const when =
-    startsIn <= 0
-      ? "starting today"
-      : startsIn === 1
-        ? "starting tomorrow"
-        : `starting ${startsIn} days from now`;
-  return `${c.deadline_count} assessments worth ${c.total_weight_pct}% are packed into ${days} days, ${when}. Getting a head start on ${first.title} (${courseCode(first.course_id)}) this weekend will make that stretch much lighter.`;
-}
-
 export async function getHeadsUp(user: AuthUser | null): Promise<HeadsUpResponse> {
   await latency();
   requireUser(user, "student");
-  const horizon = addDays(MOCK_TODAY, 14);
-  const collisions = detectCollisions(enrolledDeadlines())
-    .filter((c) => c.end >= MOCK_TODAY && c.start <= horizon)
-    .map((c) => ({ ...c, message: headsUpMessage(c) }));
-  return { collisions };
+  return { collisions: headsUp(enrolledDeadlines(), MOCK_TODAY) };
 }
 
 // ---------- rep ----------
@@ -271,34 +259,21 @@ export async function getCohort(
 ): Promise<CohortResponse> {
   await latency();
   const course = requireRepCourse(user, courseId);
-  const deadlines = allDeadlines();
   return {
     course,
     min_students: MIN_STUDENTS,
-    days: cohortDays(courseId, deadlines).filter((d) => inRange(d.date, range)),
-    deadlines: deadlines.filter((d) => inRange(d.due_date, range)),
+    // Stress is simulated from every deadline (students take several courses),
+    // but the response lists only this course's deadlines, like the backend.
+    days: cohortDays(courseId, allDeadlines()).filter((d) => inRange(d.date, range)),
+    deadlines: courseDeadlines(courseId).filter((d) => inRange(d.due_date, range)),
   };
 }
 
 function collisionsFor(courseId: number) {
-  const deadlines = allDeadlines();
-  const days = cohortDays(courseId, deadlines);
-  return detectCollisions(deadlines)
-    .filter((c) => c.deadlines.some((d) => d.course_id === courseId))
-    .map((c) => {
-      const near = days.filter(
-        (d) =>
-          !d.suppressed &&
-          d.avg_stress !== null &&
-          d.date >= addDays(c.start, -3) &&
-          d.date <= addDays(c.end, 1),
-      );
-      const peak = near.reduce<(typeof near)[number] | null>(
-        (best, d) => (best && (best.avg_stress ?? 0) >= (d.avg_stress ?? 0) ? best : d),
-        null,
-      );
-      return { ...c, peak_avg_stress: peak?.avg_stress ?? null, peak_date: peak?.date ?? null };
-    });
+  const daily = cohortDays(courseId, allDeadlines()).flatMap((d) =>
+    !d.suppressed && d.avg_stress !== null ? [{ date: d.date, avg_stress: d.avg_stress }] : [],
+  );
+  return repCollisions(courseDeadlines(courseId), daily);
 }
 
 export async function getCollisions(
@@ -312,7 +287,7 @@ export async function getCollisions(
 
 /** Find a shift (in days) that takes `target` out of every collision. */
 function suggestShift(target: Deadline): number | null {
-  const others = allDeadlines().filter((d) => d.id !== target.id);
+  const others = courseDeadlines(target.course_id).filter((d) => d.id !== target.id);
   for (const shift of [-7, 7, -14, 14]) {
     const moved = { ...target, due_date: addDays(target.due_date, shift) };
     const hit = detectCollisions([...others, moved]).some((c) =>
@@ -342,12 +317,13 @@ export async function getReport(
   const avg = days.reduce((s, d) => s + (d.avg_stress ?? 0), 0) / days.length;
   const peak = days.reduce((a, b) => ((a.avg_stress ?? 0) >= (b.avg_stress ?? 0) ? a : b));
   const collision = collisionsFor(courseId).find((c) => c.start <= weekEnd && c.end >= week_start);
-  const weekDeadlines = allDeadlines().filter(
+  const weekDeadlines = courseDeadlines(courseId).filter(
     (d) => d.due_date >= week_start && d.due_date <= weekEnd,
   );
 
   if (collision) {
-    const mine = collision.deadlines.find((d) => d.course_id === courseId)!;
+    // Suggest moving the last item in the pile-up; pushing it later is usually the easiest fix.
+    const mine = collision.deadlines.at(-1)!;
     const shift = suggestShift(mine);
     const list = collision.deadlines.map((d) => `${courseCode(d.course_id)} ${d.title}`).join(", ");
     return {
