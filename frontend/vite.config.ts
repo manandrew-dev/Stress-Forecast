@@ -15,4 +15,8 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  // Local dev on the port in docs/architecture.md §9 (backend CORS_ORIGINS, Auth0 callback URLs).
+  // strictPort: fail instead of silently moving to another port, which would break Auth0 login.
+  // Lovable's own sandbox still forces 8080; this only applies outside it.
+  vite: { server: { port: 5173, strictPort: true } },
 });
