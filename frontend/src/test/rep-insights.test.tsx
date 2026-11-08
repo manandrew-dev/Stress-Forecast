@@ -96,11 +96,23 @@ describe("rep insights panel", () => {
     ).toBeInTheDocument();
   });
 
-  it("doesn't refetch the findings when the browser tab regains focus", async () => {
+  it("shows the Databricks credit only when there are findings", async () => {
+    vi.spyOn(api, "getInsights").mockResolvedValue({ insights: [] });
+    renderPage();
+
+    expect(await screen.findByText("No insights yet")).toBeInTheDocument();
+    expect(screen.queryByText(/Found by our Databricks analysis/)).not.toBeInTheDocument();
+  });
+
+  it("doesn't refetch when the tab regains focus, even after the findings go stale", async () => {
     const getInsights = vi.spyOn(api, "getInsights").mockResolvedValue({ insights: INSIGHTS });
     renderPage();
     expect(await screen.findByText(INSIGHTS[0].finding)).toBeInTheDocument();
 
+    // Six minutes later the findings are stale, so only refetchOnWindowFocus: false
+    // keeps a tab switch from asking again.
+    const now = Date.now();
+    vi.spyOn(Date, "now").mockReturnValue(now + 6 * 60 * 1000);
     act(() => {
       focusManager.setFocused(false);
       focusManager.setFocused(true);
@@ -108,5 +120,24 @@ describe("rep insights panel", () => {
     await new Promise((r) => setTimeout(r, 20));
     expect(getInsights).toHaveBeenCalledTimes(1);
     focusManager.setFocused(undefined);
+  });
+
+  it("reuses the findings when the page is opened again within 5 minutes", async () => {
+    const getInsights = vi.spyOn(api, "getInsights").mockResolvedValue({ insights: INSIGHTS });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const page = () => (
+      <QueryClientProvider client={client}>
+        <RepCourseProvider courses={[CPSC]}>
+          <InsightsPage />
+        </RepCourseProvider>
+      </QueryClientProvider>
+    );
+
+    const first = render(page());
+    expect(await screen.findByText(INSIGHTS[0].finding)).toBeInTheDocument();
+    first.unmount();
+    render(page());
+    expect(await screen.findByText(INSIGHTS[0].finding)).toBeInTheDocument();
+    expect(getInsights).toHaveBeenCalledTimes(1);
   });
 });
