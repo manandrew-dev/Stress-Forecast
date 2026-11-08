@@ -1,14 +1,16 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { api } from "@/api/client";
-import type { CollisionsResponse, Course } from "@/api/types";
+import type { CollisionsResponse, Course, Deadline } from "@/api/types";
+import { weightByCourse } from "@/lib/weights";
 import { CollisionsPage } from "@/pages/rep/CollisionsPage";
 import { RepCourseProvider } from "@/pages/rep/RepCourseContext";
 
 const CPSC: Course = { id: 1, code: "CPSC 210", name: "Software Construction", term: "2026W1" };
+const MATH: Course = { id: 2, code: "MATH 200", name: "Calculus III", term: "2026W1" };
 
 const collisions: CollisionsResponse = {
   collisions: [
@@ -88,7 +90,7 @@ function renderPage() {
 
 beforeEach(() => {
   window.localStorage.setItem("stress-forecast:rep-course", "1");
-  vi.spyOn(api, "getCourses").mockResolvedValue({ courses: [CPSC] });
+  vi.spyOn(api, "getCourses").mockResolvedValue({ courses: [CPSC, MATH] });
 });
 
 afterEach(() => {
@@ -97,13 +99,12 @@ afterEach(() => {
 });
 
 describe("rep collision flags", () => {
-  it("shows the window, count, combined weight, deadlines, and nearby peak for each collision", async () => {
+  it("shows the window, count, deadlines, and nearby peak for each collision", async () => {
     vi.spyOn(api, "getCollisions").mockResolvedValue(collisions);
     renderPage();
 
     expect(await screen.findByText("Nov 9 – Nov 13")).toBeInTheDocument();
     expect(screen.getByText("3")).toBeInTheDocument();
-    expect(screen.getByText("55%")).toBeInTheDocument();
     expect(screen.getByText("Midterm 2")).toBeInTheDocument();
     expect(screen.getByText("Project phase 3")).toBeInTheDocument();
     expect(screen.getByText("Quiz 3")).toBeInTheDocument();
@@ -112,9 +113,22 @@ describe("rep collision flags", () => {
 
     expect(screen.getByText("Oct 5 – Oct 8")).toBeInTheDocument();
     expect(screen.getByText("2")).toBeInTheDocument();
-    expect(screen.getByText("45%")).toBeInTheDocument();
     expect(screen.getByText("Essay 1")).toBeInTheDocument();
     expect(screen.getByText("Lab 2")).toBeInTheDocument();
+  });
+
+  it("breaks the weight down by course instead of adding courses together", async () => {
+    vi.spyOn(api, "getCollisions").mockResolvedValue(collisions);
+    renderPage();
+
+    const lists = await screen.findAllByRole("list", { name: "Share of each course's grade" });
+    const items = lists.map((l) =>
+      within(l)
+        .getAllByRole("listitem")
+        .map((li) => li.textContent),
+    );
+    expect(items).toEqual([["CPSC 210 45%", "MATH 200 10%"], ["CPSC 210 45%"]]);
+    expect(screen.queryByText("combined")).not.toBeInTheDocument();
   });
 
   it("says Not enough responses when a collision has no nearby stress peak", async () => {
@@ -151,5 +165,47 @@ describe("rep collision flags", () => {
 
     expect(await screen.findByText(/Still ahead/)).toBeInTheDocument();
     expect(screen.queryByText(/Not enough responses/)).not.toBeInTheDocument();
+  });
+});
+
+describe("weightByCourse", () => {
+  const d = (
+    id: number,
+    course_id: number,
+    due_date: string,
+    weight_pct: number | null,
+  ): Deadline => ({
+    id,
+    course_id,
+    title: `D${id}`,
+    due_date,
+    weight_pct,
+    type: "other",
+  });
+
+  it("sums each course separately, ordered by first due date", () => {
+    expect(
+      weightByCourse([
+        d(1, 2, "2026-11-06", 20),
+        d(2, 1, "2026-11-03", 25),
+        d(3, 1, "2026-11-05", 10),
+      ]),
+    ).toEqual([
+      { courseId: 1, weight: 35 },
+      { courseId: 2, weight: 20 },
+    ]);
+  });
+
+  it("ignores missing weights, and shows none when a course has no weights at all", () => {
+    expect(
+      weightByCourse([
+        d(1, 1, "2026-12-04", null),
+        d(2, 1, "2026-12-05", 10),
+        d(3, 3, "2026-12-04", null),
+      ]),
+    ).toEqual([
+      { courseId: 1, weight: 10 },
+      { courseId: 3, weight: null },
+    ]);
   });
 });

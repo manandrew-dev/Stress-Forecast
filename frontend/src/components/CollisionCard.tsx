@@ -6,6 +6,7 @@ import { DeadlineRow } from "@/components/DeadlineRow";
 import { StressDot } from "@/components/StressMeter";
 import { Card } from "@/components/ui/card";
 import { rangeLabel, shortDate } from "@/lib/dates";
+import { weightByCourse } from "@/lib/weights";
 
 export function CollisionCard({
   start,
@@ -17,6 +18,7 @@ export function CollisionCard({
   footer,
   peak,
   today = new Date().toLocaleDateString("en-CA"),
+  byCourse = false,
 }: {
   start: string;
   end: string;
@@ -28,6 +30,11 @@ export function CollisionCard({
   peak?: { value: number | null; date: string | null };
   /** Local "YYYY-MM-DD"; a pile-up starting after it has no check-ins yet. */
   today?: string;
+  /**
+   * Show each course's share of its own grade instead of one combined total.
+   * Weights from different courses don't add up to anything meaningful.
+   */
+  byCourse?: boolean;
 }) {
   return (
     <Card className="animate-rise overflow-hidden">
@@ -41,11 +48,28 @@ export function CollisionCard({
             <strong className="font-semibold">{deadlineCount}</strong>{" "}
             <span className="text-muted-foreground">assessments</span>
           </span>
-          <span>
-            <strong className="font-semibold">{totalWeight}%</strong>{" "}
-            <span className="text-muted-foreground">combined</span>
-          </span>
+          {!byCourse && (
+            <span>
+              <strong className="font-semibold">{totalWeight}%</strong>{" "}
+              <span className="text-muted-foreground">combined</span>
+            </span>
+          )}
         </div>
+        {byCourse && (
+          <ul
+            className="flex w-full flex-wrap gap-2 text-sm"
+            aria-label="Share of each course's grade"
+          >
+            {weightByCourse(deadlines).map(({ courseId, weight }) => (
+              <li key={courseId} className="rounded-full border bg-card px-3 py-1">
+                <span className="text-muted-foreground">
+                  {courses.get(courseId)?.code ?? "Course"}
+                </span>{" "}
+                <strong className="font-semibold">{weight === null ? "—" : `${weight}%`}</strong>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
       <div className="px-5 py-2">
         <ul className="divide-y">
