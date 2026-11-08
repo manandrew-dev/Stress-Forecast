@@ -26,3 +26,9 @@ Keep captions honest: only describe what Freebuff did. If you or another tool ch
 - `25-weekly-report-3-query-and-states.png`: Freebuff caches each week's report (`staleTime: Infinity`, no refetch on tab focus), adds the loading and "No report yet" states, and creates `rep-report.test.tsx`.
 - `25-weekly-report-4-runs-tests.png`: Freebuff runs `npm test` and starts its summary of the changes.
 - `25-weekly-report-5-summary.png`: Freebuff's final summary: the tests it added and `npm test` passing (10 files, 82 tests).
+
+## #26 Rep insights panel (Lawrence, Nov 7)
+
+- `26-insights-panel-1-reads-and-plans.png`: Freebuff reads the requirements, the API doc and the Databricks section of `architecture.md`, the insights page and the existing rep tests, then plans an accurate description, a Databricks credit line and the tests.
+- `26-insights-panel-2-edits-and-tests.png`: Freebuff fetches findings less often (`staleTime`, no refetch on tab focus), rewrites the description so it says Databricks only sees class-wide averages, adds the credit line, creates `rep-insights.test.tsx` and runs `npm test`.
+- `26-insights-panel-3-summary.png`: Freebuff's final summary: the changes, its 4 new tests and `npm test` passing (12 files, 103 tests).
