@@ -66,6 +66,70 @@ The upgrade recognizes v1 by its original official deadlines. It moves CPSC Proj
 
 The upgrade runs in one transaction and stops if the reserved courses, official deadlines, demo mappings, enrollments, rep assignments, or targeted history differ from the expected fixture. An already-upgraded fixture keeps its stored rows. If refresh fails after the upgrade commits, rerun the same command to retry the bounded refresh. An ordinary seed rerun preserves whichever fixture version already exists. Use a fresh dedicated database if the mappings need to change or if a customized fixture cannot be upgraded safely.
 
+## Reset between presentations
+
+Use this command only on a **disposable, dedicated demo database** already populated by the seed. Use the original `DEMO_STUDENT_SUB` and `DEMO_REP_SUB`, the direct PostgreSQL `DATABASE_URL`, and a role with write access to the demo tables and ownership of `daily_course_stress`. Pause the backend and any Databricks jobs that write to the demo database, and keep them paused through refresh. The reset does not access Auth0.
+
+### Back up and designate the database
+
+Before the first live reset, make a private backup and verify it by restoring it into a separate disposable database. Use PostgreSQL connection service aliases or equivalent secure connection settings. The `stress_forecast_demo` service must point to the same dedicated database as `DATABASE_URL`.
+
+```bash
+umask 077
+backup="stress-forecast-demo-$(date -u +%Y%m%dT%H%M%SZ).dump"
+pg_dump --dbname=service=stress_forecast_demo --format=custom --file="$backup"
+pg_restore --list "$backup" >/dev/null
+```
+
+After verifying the backup using the recovery steps below, connect as the **database owner** and designate this database. The comment is a durable attestation that the database is disposable and the backup was verified. PostgreSQL cannot check whether the external backup file still exists. Never set this comment on a shared or production database.
+
+```bash
+psql -X --dbname=service=stress_forecast_demo --set=ON_ERROR_STOP=1 <<'SQL'
+SELECT format('COMMENT ON DATABASE %I IS %L', current_database(),
+    'stress-forecast:disposable-demo:backup-verified:v1:' || current_database())
+\gexec
+SQL
+```
+
+### Dry run and reset
+
+From the repository root, with the same environment used by the seed:
+
+```bash
+python -m db.reset_demo --dry-run
+python -m db.reset_demo --confirm-demo
+```
+
+Review the dry-run counts before confirming. The dry run uses a read-only snapshot, and the real reset repeats validation while holding write-blocking locks. The command requires the database designation, the exact seeded user roles and courses, and recognizable demo records. It accepts normal changes made by the mapped demo student, edits to known official assessment dates, weights, and types, and generated insights tied to demo courses. An unrecognized official assessment title, an unexpected account or course, or an unscoped record stops the reset. Keep writers paused if reset fails so you can inspect the target before retrying.
+
+On success, expect `Restored the 2026W1 demo and refreshed daily_course_stress` followed by the before and restored counts. The restored counts are **41 users** (40 students and one rep), **4 courses**, **90 enrollments**, **3 rep assignments**, **18 deadlines**, **1,992 check-ins**, **4,479 course check-ins**, and **0 insights**. The seed does not populate insights. Run the [Databricks notebook](../docs/databricks/README.md) against the dedicated demo database after reset if your presentation needs generated findings.
+
+The reset preserves Auth0 mappings, user and course IDs, and the IDs of known official deadlines. It restores the November 3–7 CPSC/MATH pile-up affecting 10 of 25 CPSC students. November 7 has no seeded check-ins. The deletion and reseed commit together. TimescaleDB refreshes affected buckets after commit, including buckets for removed live check-ins. If refresh fails, the command reports that the rows were restored. Keep writers paused and rerun the reset to retry refresh. Restart the backend before presenting to clear its cached weekly reports.
+
+### Recover from a backup
+
+Restore into a **new, empty** database with a compatible PostgreSQL version and the same TimescaleDB version. For a self-hosted restore, configure a `stress_forecast_restore` service alias for that database. Run the steps in order and stop if any fails.
+
+```bash
+psql -X --dbname=service=stress_forecast_restore --set=ON_ERROR_STOP=1 \
+    -c 'CREATE EXTENSION IF NOT EXISTS timescaledb' \
+    -c 'SELECT timescaledb_pre_restore()'
+pg_restore --exit-on-error --dbname=service=stress_forecast_restore "$backup"
+psql -X --dbname=service=stress_forecast_restore --set=ON_ERROR_STOP=1 \
+    -c 'SELECT timescaledb_post_restore()'
+```
+
+Verify the restored tables, demo mappings, and cohort queries before pointing the app at the restored database. Keep the dump private because it can contain submitted check-ins and Auth0 IDs. On Tiger Cloud, a service fork or point-in-time restore can also serve as the recovery target. [TimescaleDB logical backup and restore](https://www.tigerdata.com/docs/deploy/self-hosted/backup-and-restore/logical-backup)
+
 ## Run tests
 
-Install `backend/requirements-dev.txt`. From the repository root, run `PYTHONPATH=backend python -m pytest backend/tests db/tests`. To include the database integration test, set `SEED_TEST_DATABASE_URL` to a disposable, empty local database whose name ends with `_test` and whose schema has already been applied. That test populates the disposable database with synthetic records.
+Install `backend/requirements-dev.txt`. From the repository root, run `PYTHONPATH=backend python -m pytest backend/tests db/tests`. To include the database integration tests, apply `db/schema.sql` to separate, empty local databases whose names end with `_test`. Set `SEED_TEST_DATABASE_URL` for the seed test and `RESET_TEST_DATABASE_URL` for the reset test. Both tests populate their database with synthetic records.
+
+For example, on a local TimescaleDB server with TCP enabled:
+
+```bash
+createdb -h 127.0.0.1 stress_forecast_reset_test
+psql -X -h 127.0.0.1 -d stress_forecast_reset_test -v ON_ERROR_STOP=1 -f db/schema.sql
+RESET_TEST_DATABASE_URL=postgresql://127.0.0.1/stress_forecast_reset_test \
+    PYTHONPATH=backend python -m pytest db/tests/test_reset_demo.py
+```
