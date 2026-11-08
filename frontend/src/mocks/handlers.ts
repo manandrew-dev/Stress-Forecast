@@ -328,7 +328,13 @@ export async function getReport(
     (d) => d.date >= week_start && d.date <= weekEnd && !d.suppressed && d.avg_stress !== null,
   );
   if (days.length === 0) {
-    throw new ApiError("not_found", "There aren't enough check-ins for this week yet.", 404);
+    // Same answer as backend/app/routers/rep.py: no Gemini call, a "not enough data" report.
+    return {
+      week_start,
+      summary: "Not enough check-ins this week to report on yet.",
+      top_cause: "not enough data",
+      suggested_fix: "Encourage more students to check in so the cohort view has enough responses.",
+    };
   }
   const avg = days.reduce((s, d) => s + (d.avg_stress ?? 0), 0) / days.length;
   const peak = days.reduce((a, b) => ((a.avg_stress ?? 0) >= (b.avg_stress ?? 0) ? a : b));

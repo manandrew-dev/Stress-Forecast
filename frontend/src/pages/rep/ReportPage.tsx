@@ -7,16 +7,38 @@ import { PageHeader } from "@/components/PageHeader";
 import { EmptyState, ErrorState, LoadingBlock } from "@/components/StateViews";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useCourseMap } from "@/components/useCourseMap";
 import { ApiError } from "@/api/errors";
 import { addDays, rangeLabel, weekStartOf } from "@/lib/dates";
 import { WithCourse } from "./PickCourse";
 
+/** What the API puts in top_cause when a week has too few check-ins for a report. */
+const NOT_ENOUGH_DATA = "not enough data";
+
+/**
+ * Each report request can cost a Gemini call, and the API answers every server-side
+ * failure (including Gemini quota and overload) with the same 500, so retrying those
+ * just spends quota. Only a network error, where the request may never have arrived,
+ * is retried, and only once. "Try again" is always there for the rep.
+ */
+function shouldRetryReport(failureCount: number, error: unknown): boolean {
+  return error instanceof ApiError && error.code === "network_error" && failureCount < 1;
+}
+
 function Report({ courseId }: { courseId: number }) {
   const courses = useCourseMap();
   // The cohort timeline tells us which weeks have data.
-  const cohort = useQuery({ queryKey: qk.cohort(courseId), queryFn: () => api.getCohort(courseId) });
+  const cohort = useQuery({
+    queryKey: qk.cohort(courseId),
+    queryFn: () => api.getCohort(courseId),
+  });
   const weeks = useMemo(() => {
     const days = cohort.data?.days ?? [];
     const first = days[0];
@@ -36,7 +58,11 @@ function Report({ courseId }: { courseId: number }) {
     queryKey: qk.report(courseId, week ?? ""),
     queryFn: () => api.getReport(courseId, week!),
     enabled: !!week,
-    retry: (n, e) => !(e instanceof ApiError && e.status === 404) && n < 2,
+    // Gemini's free quota is small: a week's report is fetched once and reused.
+    staleTime: Infinity,
+    gcTime: Infinity,
+    refetchOnWindowFocus: false,
+    retry: shouldRetryReport,
   });
 
   const idx = week ? weeks.indexOf(week) : -1;
@@ -49,8 +75,14 @@ function Report({ courseId }: { courseId: number }) {
         title="What happened this week"
       />
 
-      {cohort.isError ? (
+      {cohort.isPending ? (
+        <LoadingBlock rows={2} />
+      ) : cohort.isError ? (
         <ErrorState error={cohort.error} onRetry={() => cohort.refetch()} />
+      ) : weeks.length === 0 ? (
+        <EmptyState icon={FileBarChart} title="No report yet">
+          There aren't enough check-ins for this course yet.
+        </EmptyState>
       ) : !week ? (
         <LoadingBlock rows={2} />
       ) : (
@@ -66,7 +98,10 @@ function Report({ courseId }: { courseId: number }) {
               <ChevronLeft />
             </Button>
             <Select value={week} onValueChange={setWeek}>
-              <SelectTrigger className="h-10 flex-1 rounded-full bg-card sm:max-w-72" aria-label="Week">
+              <SelectTrigger
+                className="h-10 flex-1 rounded-full bg-card sm:max-w-72"
+                aria-label="Week"
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -91,13 +126,12 @@ function Report({ courseId }: { courseId: number }) {
           {report.isPending ? (
             <LoadingBlock rows={2} />
           ) : report.isError ? (
-            report.error instanceof ApiError && report.error.status === 404 ? (
-              <EmptyState icon={FileBarChart} title="No report for this week">
-                {report.error.message}
-              </EmptyState>
-            ) : (
-              <ErrorState error={report.error} onRetry={() => report.refetch()} />
-            )
+            <ErrorState error={report.error} onRetry={() => report.refetch()} />
+          ) : report.data.top_cause === NOT_ENOUGH_DATA ? (
+            // A week without enough check-ins comes back as a normal answer (docs/api.md).
+            <EmptyState icon={FileBarChart} title="No report yet">
+              {report.data.summary || "There aren't enough check-ins for this week yet."}
+            </EmptyState>
           ) : (
             <Card className="animate-rise overflow-hidden" key={report.data.week_start}>
               <div className="p-5 sm:p-6">

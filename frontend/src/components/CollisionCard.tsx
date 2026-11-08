@@ -52,7 +52,9 @@ export function CollisionCard({
         <div className="ml-auto flex gap-4 text-sm">
           <span>
             <strong className="font-semibold">{deadlineCount}</strong>{" "}
-            <span className="text-muted-foreground">assessments</span>
+            <span className="text-muted-foreground">
+              {deadlineCount === 1 ? "assessment" : "assessments"}
+            </span>
           </span>
           {byCourse ? (
             <span>
@@ -111,7 +113,8 @@ export function CollisionCard({
           {peak.value !== null && peak.date ? (
             <span>
               Nearby stress peak: <StressDot value={peak.value} className="mx-1 align-middle" />
-              <strong className="font-semibold">{peak.value}</strong> on {shortDate(peak.date)}
+              <strong className="font-semibold">{peak.value.toFixed(1)}</strong> on{" "}
+              {shortDate(peak.date)}
             </span>
           ) : start >= today ? (
             <span className="text-muted-foreground">
