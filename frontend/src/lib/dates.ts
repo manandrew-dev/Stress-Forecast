@@ -56,3 +56,12 @@ export function longDate(day: string): string {
 export function rangeLabel(start: string, end: string): string {
   return start === end ? longDate(start) : `${shortDate(start)} – ${shortDate(end)}`;
 }
+
+/** "Today", "Tomorrow", "In 5 days", "Yesterday", "12 days ago". */
+export function relativeDay(due: string, today: string): string {
+  const d = diffDays(due, today);
+  if (d === 0) return "Today";
+  if (d === 1) return "Tomorrow";
+  if (d === -1) return "Yesterday";
+  return d > 0 ? `In ${d} days` : `${-d} days ago`;
+}

@@ -18,6 +18,7 @@ export type AppPath =
   | "/student"
   | "/student/check-in"
   | "/student/trend"
+  | "/student/deadlines"
   | "/student/syllabus"
   | "/student/courses"
   | "/rep"

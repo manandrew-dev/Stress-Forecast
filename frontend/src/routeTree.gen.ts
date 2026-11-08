@@ -19,6 +19,7 @@ import { Route as RepReportRouteImport } from './routes/rep.report'
 import { Route as StudentIndexRouteImport } from './routes/student.index'
 import { Route as StudentCheckInRouteImport } from './routes/student.check-in'
 import { Route as StudentCoursesRouteImport } from './routes/student.courses'
+import { Route as StudentDeadlinesRouteImport } from './routes/student.deadlines'
 import { Route as StudentSyllabusRouteImport } from './routes/student.syllabus'
 import { Route as StudentTrendRouteImport } from './routes/student.trend'
 
@@ -72,6 +73,11 @@ const StudentCoursesRoute = StudentCoursesRouteImport.update({
   path: '/courses',
   getParentRoute: () => StudentRoute,
 } as any)
+const StudentDeadlinesRoute = StudentDeadlinesRouteImport.update({
+  id: '/deadlines',
+  path: '/deadlines',
+  getParentRoute: () => StudentRoute,
+} as any)
 const StudentSyllabusRoute = StudentSyllabusRouteImport.update({
   id: '/syllabus',
   path: '/syllabus',
@@ -92,6 +98,7 @@ export interface FileRoutesByFullPath {
   '/rep/report': typeof RepReportRoute
   '/student/check-in': typeof StudentCheckInRoute
   '/student/courses': typeof StudentCoursesRoute
+  '/student/deadlines': typeof StudentDeadlinesRoute
   '/student/syllabus': typeof StudentSyllabusRoute
   '/student/trend': typeof StudentTrendRoute
   '/rep/': typeof RepIndexRoute
@@ -104,6 +111,7 @@ export interface FileRoutesByTo {
   '/rep/report': typeof RepReportRoute
   '/student/check-in': typeof StudentCheckInRoute
   '/student/courses': typeof StudentCoursesRoute
+  '/student/deadlines': typeof StudentDeadlinesRoute
   '/student/syllabus': typeof StudentSyllabusRoute
   '/student/trend': typeof StudentTrendRoute
   '/rep': typeof RepIndexRoute
@@ -119,6 +127,7 @@ export interface FileRoutesById {
   '/rep/report': typeof RepReportRoute
   '/student/check-in': typeof StudentCheckInRoute
   '/student/courses': typeof StudentCoursesRoute
+  '/student/deadlines': typeof StudentDeadlinesRoute
   '/student/syllabus': typeof StudentSyllabusRoute
   '/student/trend': typeof StudentTrendRoute
   '/rep/': typeof RepIndexRoute
@@ -135,6 +144,7 @@ export interface FileRouteTypes {
     | '/rep/report'
     | '/student/check-in'
     | '/student/courses'
+    | '/student/deadlines'
     | '/student/syllabus'
     | '/student/trend'
     | '/rep/'
@@ -147,6 +157,7 @@ export interface FileRouteTypes {
     | '/rep/report'
     | '/student/check-in'
     | '/student/courses'
+    | '/student/deadlines'
     | '/student/syllabus'
     | '/student/trend'
     | '/rep'
@@ -161,6 +172,7 @@ export interface FileRouteTypes {
     | '/rep/report'
     | '/student/check-in'
     | '/student/courses'
+    | '/student/deadlines'
     | '/student/syllabus'
     | '/student/trend'
     | '/rep/'
@@ -245,6 +257,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudentCoursesRouteImport
       parentRoute: typeof StudentRoute
     }
+    '/student/deadlines': {
+      id: '/student/deadlines'
+      path: '/deadlines'
+      fullPath: '/student/deadlines'
+      preLoaderRoute: typeof StudentDeadlinesRouteImport
+      parentRoute: typeof StudentRoute
+    }
     '/student/syllabus': {
       id: '/student/syllabus'
       path: '/syllabus'
@@ -281,6 +300,7 @@ const RepRouteWithChildren = RepRoute._addFileChildren(RepRouteChildren)
 interface StudentRouteChildren {
   StudentCheckInRoute: typeof StudentCheckInRoute
   StudentCoursesRoute: typeof StudentCoursesRoute
+  StudentDeadlinesRoute: typeof StudentDeadlinesRoute
   StudentSyllabusRoute: typeof StudentSyllabusRoute
   StudentTrendRoute: typeof StudentTrendRoute
   StudentIndexRoute: typeof StudentIndexRoute
@@ -289,6 +309,7 @@ interface StudentRouteChildren {
 const StudentRouteChildren: StudentRouteChildren = {
   StudentCheckInRoute: StudentCheckInRoute,
   StudentCoursesRoute: StudentCoursesRoute,
+  StudentDeadlinesRoute: StudentDeadlinesRoute,
   StudentSyllabusRoute: StudentSyllabusRoute,
   StudentTrendRoute: StudentTrendRoute,
   StudentIndexRoute: StudentIndexRoute,
