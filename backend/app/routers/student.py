@@ -1,5 +1,7 @@
 """Student endpoints are implemented in issue #16."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
-router = APIRouter()
+from ..auth import require_role
+
+router = APIRouter(dependencies=[Depends(require_role("student"))])

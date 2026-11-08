@@ -175,9 +175,10 @@ Notes:
 - **Frontend:** `@auth0/auth0-react`. Request an access token for our API's **audience** and send it as `Authorization: Bearer <token>` on every request.
 - **Roles:** create `student` and `rep` roles in Auth0. A **Post-Login Action** adds them to the access token as a custom claim:
   `https://stressforecast.app/roles` → `["student"]` or `["rep"]`.
-- **API:** `auth.py` verifies the JWT against Auth0's JWKS (RS256), checks `aud` and `iss`, reads the roles claim, and upserts the user into `users` on first request.
-- **Route protection:** every router uses `Depends(require_role("student"))` or `Depends(require_role("rep"))`. Reps additionally must have a `rep_assignments` row for the course they request (403 otherwise).
+- **API:** `auth.py` verifies RS256 access tokens against the tenant JWKS and validates issuer, audience, subject, and time claims. It synchronizes the verified subject and application role with `users`.
+- **Route protection:** the shared router accepts either role through `get_current_user`. The student router uses `require_role("student")`. The rep router uses `require_rep_course`, which requires `rep` and a `rep_assignments` row matching the `{course_id}` in the URL.
 - **MFA (P2):** in the same Post-Login Action, require MFA when the user has the `rep` role.
+- **Tenant setup:** see [Auth0 dashboard and demo account setup](auth0.md).
 
 ## 6. AI (Gemini)
 
