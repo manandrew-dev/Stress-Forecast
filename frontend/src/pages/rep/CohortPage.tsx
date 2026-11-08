@@ -58,7 +58,7 @@ function CohortView({ data }: { data: CohortResponse }) {
         <div className="rounded-2xl border bg-card px-4 py-3 shadow-soft">
           <p className="text-xs text-muted-foreground">Highest day</p>
           <p className="font-display text-2xl font-semibold">
-            {view.peak ? `${view.peak.value}` : "—"}
+            {view.peak ? (view.peak.value ?? 0).toFixed(1) : "—"}
             {view.peak && <span className="ml-1.5 text-sm font-normal text-muted-foreground">{shortDate(view.peak.date)}</span>}
           </p>
         </div>

@@ -351,7 +351,7 @@ export async function getReport(
     const list = collision.deadlines.map((d) => `${courseCode(d.course_id)} ${d.title}`).join(", ");
     return {
       week_start,
-      summary: `Average stress was ${avg.toFixed(1)} this week, peaking at ${peak.avg_stress} on ${longDate(peak.date)}. ${collision.deadline_count} assessments worth ${collision.total_weight_pct}% combined landed between ${rangeLabel(collision.start, collision.end)}: ${list}.`,
+      summary: `Average stress was ${avg.toFixed(1)} this week, peaking at ${(peak.avg_stress ?? 0).toFixed(1)} on ${longDate(peak.date)}. ${collision.deadline_count} assessments worth ${collision.total_weight_pct}% combined landed between ${rangeLabel(collision.start, collision.end)}: ${list}.`,
       top_cause: `${collision.deadline_count} assessments within ${diffDays(collision.end, collision.start) + 1} days`,
       suggested_fix:
         shift === null
@@ -363,7 +363,7 @@ export async function getReport(
   if (biggest) {
     return {
       week_start,
-      summary: `Average stress was ${avg.toFixed(1)}, with a peak of ${peak.avg_stress} on ${shortDate(peak.date)}. ${weekDeadlines.length} deadline${weekDeadlines.length > 1 ? "s" : ""} this week, none overlapping heavily.`,
+      summary: `Average stress was ${avg.toFixed(1)}, with a peak of ${(peak.avg_stress ?? 0).toFixed(1)} on ${shortDate(peak.date)}. ${weekDeadlines.length} deadline${weekDeadlines.length > 1 ? "s" : ""} this week, none overlapping heavily.`,
       top_cause: `${courseCode(biggest.course_id)} ${biggest.title}`,
       suggested_fix: `No schedule change needed. Posting practice material a week before ${biggest.title} could soften the run-up.`,
     };

@@ -198,16 +198,15 @@ describe("GET /report (mock)", () => {
 });
 
 describe("mock data mirrors db/seed.py", () => {
-  it("shows the rep the week 9 pile-up across a shared course, like the seed", async () => {
+  it("shows the rep the week 9 pile-up across CPSC 210 and MATH 200, like the seed", async () => {
     const { collisions } = await run(mock.getCollisions(rep, 1));
     const week9 = collisions.find((c) => c.start >= "2026-11-02" && c.start <= "2026-11-08");
-    expect(week9).toMatchObject({ deadline_count: 3, total_weight_pct: 55 });
+    expect(week9).toMatchObject({ deadline_count: 3, total_weight_pct: 55, students_affected: 10 });
     expect(week9!.deadlines.map((d) => [d.course_id, d.title])).toEqual([
       [1, "Midterm 2"],
       [2, "Midterm 2"],
       [1, "Quiz 4"],
     ]);
-    expect(week9!.students_affected).toBeGreaterThanOrEqual(5);
     expect(week9!.peak_avg_stress).not.toBeNull();
   });
 

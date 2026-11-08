@@ -69,12 +69,9 @@ The card is shared with the student heads-up card. The per-course view is turned
 
 ## Status
 
-Done (frontend):
+Built end to end:
 
+- **Backend:** shared courses, the own-course rule, `students_affected` and `cohort_size` (`backend/app/services/collisions.py`, `cohort.py`, `routers/rep.py`; PR #63).
+- **Seed:** week 9 is a cross-course pile-up (PR #61, see `db/README.md`).
 - **Card:** "Affects X of Y students" and a "This course" badge on the rep's own deadlines (`CollisionCard.tsx`, `DeadlineRow.tsx`).
-- **Sample data:** `frontend/src/mocks/` follows the new rules (`crossCourseRepCollisions` and `sharedCourseIds` in `collisions.ts`), using the seed's courses, deadlines and student course combinations. Example: DEMO CPSC 210's finals week (CPSC 20%, PHYS 35%, MATH 40%) affects 20 of 25 students.
-
-Still to do:
-
-- **Backend (#17):** shared courses, the own-course rule, `students_affected` and `cohort_size`. Until then, switching off sample data shows single-course pile-ups and no "Affects" line.
-- **Seed (`db/seed.py`):** optional; the finals week already gives the demo a cross-course pile-up.
+- **Sample data:** `frontend/src/mocks/` follows the same rules with the seed's courses, deadlines and course combinations, so sample mode and the real API match. DEMO CPSC 210 (25 students): week 9 (CPSC Midterm 2, MATH Midterm 2, CPSC Quiz 4, 55%) affects 10; finals week (CPSC 20%, PHYS 35%, MATH 40%) affects 20.
