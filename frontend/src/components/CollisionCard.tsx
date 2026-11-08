@@ -6,6 +6,7 @@ import { DeadlineRow } from "@/components/DeadlineRow";
 import { StressDot } from "@/components/StressMeter";
 import { Card } from "@/components/ui/card";
 import { rangeLabel, shortDate } from "@/lib/dates";
+import { averageCourseWeight, weightByCourse } from "@/lib/weights";
 
 export function CollisionCard({
   start,
@@ -16,6 +17,8 @@ export function CollisionCard({
   courses,
   footer,
   peak,
+  today = new Date().toLocaleDateString("en-CA"),
+  byCourse = false,
 }: {
   start: string;
   end: string;
@@ -25,6 +28,13 @@ export function CollisionCard({
   courses: Map<number, Course>;
   footer?: ReactNode;
   peak?: { value: number | null; date: string | null };
+  /** Local "YYYY-MM-DD"; a pile-up starting on or after it is still ahead. */
+  today?: string;
+  /**
+   * Show each course's share and the average per course instead of one combined
+   * total. Weights from different courses don't add up to anything meaningful.
+   */
+  byCourse?: boolean;
 }) {
   return (
     <Card className="animate-rise overflow-hidden">
@@ -38,11 +48,37 @@ export function CollisionCard({
             <strong className="font-semibold">{deadlineCount}</strong>{" "}
             <span className="text-muted-foreground">assessments</span>
           </span>
-          <span>
-            <strong className="font-semibold">{totalWeight}%</strong>{" "}
-            <span className="text-muted-foreground">combined</span>
-          </span>
+          {byCourse ? (
+            <span>
+              <strong className="font-semibold">
+                {averageCourseWeight(deadlines) === null
+                  ? "—"
+                  : `${averageCourseWeight(deadlines)}%`}
+              </strong>{" "}
+              <span className="text-muted-foreground">avg per course</span>
+            </span>
+          ) : (
+            <span>
+              <strong className="font-semibold">{totalWeight}%</strong>{" "}
+              <span className="text-muted-foreground">combined</span>
+            </span>
+          )}
         </div>
+        {byCourse && (
+          <ul
+            className="flex w-full flex-wrap gap-2 text-sm"
+            aria-label="Share of each course's grade"
+          >
+            {weightByCourse(deadlines).map(({ courseId, weight }) => (
+              <li key={courseId} className="rounded-full border bg-card px-3 py-1">
+                <span className="text-muted-foreground">
+                  {courses.get(courseId)?.code ?? "Course"}
+                </span>{" "}
+                <strong className="font-semibold">{weight === null ? "—" : `${weight}%`}</strong>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
       <div className="px-5 py-2">
         <ul className="divide-y">
@@ -59,8 +95,12 @@ export function CollisionCard({
               Nearby stress peak: <StressDot value={peak.value} className="mx-1 align-middle" />
               <strong className="font-semibold">{peak.value}</strong> on {shortDate(peak.date)}
             </span>
+          ) : start >= today ? (
+            <span className="text-muted-foreground">
+              Still ahead — no check-ins for these days yet.
+            </span>
           ) : (
-            <span className="text-muted-foreground">No stress data yet — this is still ahead.</span>
+            <span className="text-muted-foreground">Nearby stress peak: Not enough responses</span>
           )}
         </div>
       )}

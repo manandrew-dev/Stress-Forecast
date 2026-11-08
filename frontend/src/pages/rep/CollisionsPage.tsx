@@ -10,7 +10,10 @@ import { WithCourse } from "./PickCourse";
 
 function Collisions({ courseId }: { courseId: number }) {
   const courses = useCourseMap();
-  const q = useQuery({ queryKey: qk.collisions(courseId), queryFn: () => api.getCollisions(courseId) });
+  const q = useQuery({
+    queryKey: qk.collisions(courseId),
+    queryFn: () => api.getCollisions(courseId),
+  });
   const code = courses.get(courseId)?.code;
 
   return (
@@ -40,6 +43,7 @@ function Collisions({ courseId }: { courseId: number }) {
               deadlines={c.deadlines}
               courses={courses}
               peak={{ value: c.peak_avg_stress, date: c.peak_date }}
+              byCourse
             />
           ))}
         </div>
