@@ -72,7 +72,7 @@ The card is shared with the student heads-up card. The per-course view is turned
 Done (frontend):
 
 - **Card:** "Affects X of Y students" and a "This course" badge on the rep's own deadlines (`CollisionCard.tsx`, `DeadlineRow.tsx`).
-- **Sample data:** `frontend/src/mocks/` follows the new rules (`crossCourseRepCollisions` and `sharedCourseIds` in `collisions.ts`), using the seed's courses, deadlines and student course combinations. Example: DEMO CPSC 210's finals week (CPSC 20%, PHYS 35%, MATH 40%) affects 20 of 25 students.
+- **Sample data:** `frontend/src/mocks/` follows the new rules (`crossCourseRepCollisions` and `sharedCourseIds` in `collisions.ts`), using the seed's courses, deadlines and student course combinations. Examples for DEMO CPSC 210 (25 students), matching the seed: week 9 (CPSC Midterm 2, MATH Midterm 2, CPSC Quiz 4, 55%) affects 10; finals week (CPSC 20%, PHYS 35%, MATH 40%) affects 20.
 
 Still to do:
 

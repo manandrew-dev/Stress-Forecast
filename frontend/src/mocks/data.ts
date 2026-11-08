@@ -2,7 +2,8 @@ import type { Course, Deadline } from "@/api/types";
 
 // Mirrors db/seed.py so screens look the same with VITE_USE_MOCKS on or off:
 // same courses, deadlines, enrolments and rep assignments. "Today" is the seed's DEMO_DAY;
-// week 9 (Nov 2–8) has just been hit by a 3-assessment, 55% pile-up inside DEMO CPSC 210.
+// week 9 (Nov 2–8) has just been hit by a 3-assessment, 55% pile-up across DEMO CPSC 210
+// and DEMO MATH 200 (seed PR #61), which 10 of CPSC 210's 25 students feel.
 export const TERM = "2026W1";
 export const TERM_START = "2026-09-08";
 export const TERM_END = "2026-12-18";
@@ -25,7 +26,7 @@ export const DEMO_STUDENT_COURSE_IDS = [1, 2];
 
 /** db/seed.py ASSESSMENTS, in insertion order (ids 1–18 on a fresh database). */
 export const BASE_DEADLINES: Deadline[] = [
-  // DEMO CPSC 210 (week 9: Midterm 2 + Project Phase 3 + Quiz 4 = 55% in 5 days)
+  // DEMO CPSC 210 (week 9: Midterm 2 + MATH 200 Midterm 2 + Quiz 4 = 55% in 5 days)
   {
     id: 1,
     course_id: 1,
@@ -54,7 +55,7 @@ export const BASE_DEADLINES: Deadline[] = [
     id: 4,
     course_id: 1,
     title: "Project Phase 3",
-    due_date: "2026-11-05",
+    due_date: "2026-11-19",
     weight_pct: 25,
     type: "project",
   },
@@ -88,7 +89,7 @@ export const BASE_DEADLINES: Deadline[] = [
     id: 9,
     course_id: 2,
     title: "Midterm 2",
-    due_date: "2026-11-19",
+    due_date: "2026-11-05",
     weight_pct: 25,
     type: "midterm",
   },
@@ -192,7 +193,7 @@ export const INSIGHTS: Record<number, { week_start: string; finding: string }[]>
     {
       week_start: "2026-11-02",
       finding:
-        "Midterm 2, Project Phase 3 and Quiz 4 (55% combined) fell within 5 days, and average stress reached its highest level of the term so far.",
+        "Midterm 2 (20%) and Quiz 4 (10%) fell within 5 days, and average stress reached its highest level of the term so far.",
     },
     {
       week_start: "2026-10-05",
