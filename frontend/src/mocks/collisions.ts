@@ -132,7 +132,7 @@ export function sharedCourseIds(
  * run the rule over this course's and its shared courses' deadlines, keep windows with at
  * least one of this course's deadlines, count the students who'd see the window as a
  * collision given their own courses, and drop windows under `minStudents`.
- * Ahead of the backend until #17 implements it; repCollisions above stays at parity.
+ * Mirrors cross_course_rep_collisions in backend/app/services/collisions.py.
  */
 export function crossCourseRepCollisions(
   courseId: number,
