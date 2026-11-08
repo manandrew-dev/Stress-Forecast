@@ -1,6 +1,16 @@
 # Freebuff screenshots
 
-Screenshots of Freebuff sessions, for the "Best Project Built with Freebuff" write-up. One line per screenshot.
+Everyone's Freebuff screenshots go in this folder. Khan builds the "Best Project Built with Freebuff" write-up from them, so the more good sessions we capture, the stronger it is.
+
+## How to add yours
+
+1. **Take screenshots while Freebuff works** (Mac: Cmd + Shift + 4, then drag). Good moments: it reading the code, its plan, its edits, and the passing tests. Expand collapsed output ("Show more lines") first so the results are visible.
+2. **Name them** `<issue>-<short-name>-<step>-<what>.png`, for example `16-checkin-endpoint-2-plans-route.png`. Numbering the steps keeps them in order.
+3. **Put them in this folder** (`docs/freebuff/`), not in a subfolder.
+4. **Add a section below** with a heading `## #<issue> <title> (<your name>, <date>)` and one line per screenshot saying what Freebuff did in it.
+5. **Commit them with the feature** in the same PR.
+
+Keep captions honest: only describe what Freebuff did. If you or another tool changed the code afterwards, don't credit Freebuff for it.
 
 ## #24 Rep collision flags (Lawrence, Nov 7)
 
