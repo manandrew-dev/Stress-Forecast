@@ -2,7 +2,7 @@
 
 How the rep's **Pile-ups** page (`frontend/src/pages/rep/CollisionsPage.tsx`) shows each collision. Which windows count as a collision is decided by the backend (`docs/requirements.md` §4); this page only covers how they're displayed.
 
-> **Sample data:** `frontend/src/mocks/collisions.ts` mirrors the backend rules exactly (same thresholds, one course's deadlines only, same peak window). The example card below is from the earlier sample data, which counted other courses' deadlines; the numbers still show how the card works.
+> **Sample data vs the real backend:** the backend flags a 5-day window with 3+ assessments or 40%+ combined weight (`backend/app/config.py`). The sample data in `frontend/src/mocks/collisions.ts` uses a looser rule (2+ assessments and 30%+), so some demo cards, like Oct 6–8 (2 assessments, 35%), only appear with sample data. It also searches one extra day past the window for the stress peak.
 
 ## What a card shows
 
