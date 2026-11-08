@@ -4,7 +4,7 @@
 
 Built at HackCamp 2026. Students do a 30-second daily check-in and upload their syllabi. We line up anonymized, class-wide stress against every deadline in their courses, flag the weeks where deadlines pile up, and give class reps the evidence to ask for a date to move.
 
-**Slides:** https://claude.ai/artifact/Xb2xyi7A5od3Ka5ffTe6Xa
+**Figma:** https://www.figma.com/design/RnZfnSDgXSIwCTBCtCm2DH/Stress-Forecast?node-id=2-4&t=tqvBF1zWmvZsywUi-1
 
 ## The problem
 
