@@ -107,6 +107,7 @@ def test_weekly_report_sends_only_aggregates(fake):
         deadline_count=1,
         total_weight_pct=25,
         deadlines=[deadline],
+        students_affected=10,
         peak_avg_stress=8.1,
         peak_date=dt.date(2026, 11, 8),
     )
@@ -128,3 +129,24 @@ def test_weekly_report_sends_only_aggregates(fake):
     # No ids of any kind leave the server.
     assert "id" not in sent["course"]
     assert all("id" not in d and "course_id" not in d for d in sent["deadlines"])
+    assert sent["deadlines"][0]["course"] == "CPSC 210" and sent["deadlines"][0]["own_course"] is True
+    # No student or enrollment data: collisions don't carry students_affected.
+    assert all("students_affected" not in c for c in sent["collisions"])
+
+
+def test_weekly_report_marks_shared_course_deadlines(fake):
+    reply = json.dumps({"summary": "s", "top_cause": "t", "suggested_fix": "f"})
+    models = fake(reply)
+    course = Course(id=1, code="CPSC 210", name="Software Construction", term="2026W1")
+    own = Deadline(id=1, course_id=1, title="Midterm 2", due_date=dt.date(2026, 11, 3), weight_pct=20, type="midterm")
+    other = Deadline(id=2, course_id=2, title="Midterm 2", due_date=dt.date(2026, 11, 5), weight_pct=25, type="midterm")
+    unknown = Deadline(id=3, course_id=9, title="Lab", due_date=dt.date(2026, 11, 6), weight_pct=5, type="quiz")
+    asyncio.run(gemini.weekly_report(
+        course, [(dt.date(2026, 11, 3), 6.0)], [own, other, unknown], [],
+        week_start=dt.date(2026, 11, 2), course_codes={2: "MATH 200"},
+    ))
+    sent = json.loads(models.calls[0]["contents"])
+    assert [(d["course"], d["own_course"]) for d in sent["deadlines"]] == [
+        ("CPSC 210", True), ("MATH 200", False), ("another course", False)]
+    prompt = models.calls[0]["config"].system_instruction
+    assert '"own_course": true' in prompt and "never another course" in prompt
